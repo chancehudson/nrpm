@@ -32,7 +32,8 @@ pub async fn upload_tarball(url: &str, tarball: File) -> Result<()> {
     }
 }
 
-/// Create a tarball from `path`, which must exist and be a directory.
+/// Create a tarball from `path`, which must exist and be a directory. Returned value with be
+/// a temporary File handle that is removed on Drop. Make sure to copy the file if persistence is needed!
 ///
 /// This function will look for a .gitignore in all directories and follow it.
 /// Empty directories are not included. Irregular files (symlinks, block devices, etc) are not included.
@@ -85,7 +86,7 @@ pub fn create_tarball(path: PathBuf) -> Result<File> {
         a.append_file(relative_path, &mut file)?;
     }
     let mut tarball = a.into_inner()?;
-    // reset the file handle for copying to final destination
+    // reset the file handle for use by caller
     tarball.seek(std::io::SeekFrom::Start(0))?;
     Ok(tarball)
 }

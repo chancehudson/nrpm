@@ -1,6 +1,5 @@
 use std::fs::File;
 use std::io;
-use std::io::Seek;
 use std::path::PathBuf;
 
 use clap::Arg;
@@ -29,12 +28,10 @@ async fn main() -> anyhow::Result<()> {
         let tarball = publish::create_tarball(path)?;
         if let Some(archive_path) = matches.get_one::<String>("archive") {
             let mut tarball = tarball;
-            // reset the file handle for copying to final destination
-            tarball.seek(std::io::SeekFrom::Start(0))?;
             io::copy(&mut tarball, &mut File::create(archive_path)?)?;
-            return Ok(());
+        } else {
+            publish::upload_tarball("http://127.0.0.1:3000/publish", tarball).await?;
         }
-        publish::upload_tarball("http://127.0.0.1:3000/publish", tarball).await?;
     }
     Ok(())
 }
@@ -58,7 +55,7 @@ fn cli() -> Command {
                         .short('a')
                         .long("archive")
                         .value_name("path")
-                        .action(ArgAction::Set).help("Generate a package tarball and save it to local file instead of publishing"),
+                        .action(ArgAction::Set).help("Generate a package tarball and save it to local file instead of uploading to registry"),
                 ).arg(Arg::new("path").short('p').long("path").value_name("path").action(ArgAction::Set).help("Publish a package from a custom path"))
         )
 }
