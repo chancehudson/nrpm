@@ -1,14 +1,36 @@
-use std::collections::BTreeMap;
 use std::fs::File;
+use std::io::Read;
 use std::io::Seek;
-use std::path::Component;
 use std::path::PathBuf;
 
 use anyhow::Result;
 use ignore::WalkBuilder;
-use tar::Archive;
-use tar::EntryType;
+use reqwest::multipart;
 use tempfile::tempfile;
+
+pub async fn upload_tarball(url: &str, tarball: File) -> Result<()> {
+    let mut tarball = tarball;
+    let client = reqwest::Client::new();
+    let hash = common::hash_tarball(&tarball)?;
+    // reset the file handle for copying to final destination
+    tarball.seek(std::io::SeekFrom::Start(0))?;
+    let mut tarball_bytes = vec![];
+    tarball.read_to_end(&mut tarball_bytes)?;
+    println!("Uploading: {} bytes", tarball_bytes.len());
+    println!("Hash: {}", hash.to_string());
+    let form = multipart::Form::new().text("hash", hash.to_string()).part(
+        "tarball",
+        multipart::Part::bytes(tarball_bytes)
+            .file_name("package.tar")
+            .mime_str("application/tar")?,
+    );
+    let response = client.post(url).multipart(form).send().await?;
+    if response.status().is_success() {
+        Ok(())
+    } else {
+        anyhow::bail!("Upload failed with status: {}", response.status());
+    }
+}
 
 /// Create a tarball from `path`, which must exist and be a directory.
 ///
@@ -66,49 +88,4 @@ pub fn create_tarball(path: PathBuf) -> Result<File> {
     // reset the file handle for copying to final destination
     tarball.seek(std::io::SeekFrom::Start(0))?;
     Ok(tarball)
-}
-
-/// Take a tar archive and calculate a content based hash. Each file is separately hashed
-/// by hashing each path component followed by contents. A final hash is created by combining
-/// all file hashes in lexicographic order of file paths.
-pub fn hash_tarball(tarball: &File) -> Result<blake3::Hash> {
-    let mut archive = Archive::new(tarball);
-
-    println!("Hashing files...");
-    // this approach allows content hashes to be calculated in parallel
-    // while remaining deterministic
-    let mut ordered_files: BTreeMap<PathBuf, blake3::Hash> = BTreeMap::new();
-    for entry in archive.entries()? {
-        let entry = entry?;
-        match entry.header().entry_type() {
-            EntryType::Regular => {
-                let mut hasher = blake3::Hasher::new();
-                // only hash the filepath and the contents
-                let path = entry.path()?.to_path_buf();
-                for component in path.components() {
-                    match component {
-                        Component::Normal(component) => {
-                            hasher.update(component.as_encoded_bytes());
-                        }
-                        _ => anyhow::bail!("Non-normal path component detected in tarball"),
-                    }
-                }
-                hasher.update_reader(entry)?;
-                ordered_files.insert(path, hasher.finalize());
-            }
-            EntryType::Directory => {
-                continue;
-            }
-            _ => anyhow::bail!(
-                "Irregular entry detected in tar archive. Only directories and files are allowed in package tarballs!"
-            ),
-        }
-    }
-    // now combine our ordered hashes into a final hash
-    let mut hasher = blake3::Hasher::new();
-    for (file, hash) in ordered_files {
-        println!("{:?}", file);
-        hasher.update(hash.as_bytes());
-    }
-    Ok(hasher.finalize())
 }

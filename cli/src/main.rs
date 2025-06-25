@@ -8,8 +8,6 @@ use clap::ArgAction;
 use clap::Command;
 use tokio;
 
-use crate::publish::hash_tarball;
-
 mod publish;
 
 #[tokio::main]
@@ -29,14 +27,14 @@ async fn main() -> anyhow::Result<()> {
             })
             .unwrap_or(cwd);
         let tarball = publish::create_tarball(path)?;
-        let hash = hash_tarball(&tarball)?;
-        println!("Tarball hash: {:?}", hash);
         if let Some(archive_path) = matches.get_one::<String>("archive") {
             let mut tarball = tarball;
             // reset the file handle for copying to final destination
             tarball.seek(std::io::SeekFrom::Start(0))?;
             io::copy(&mut tarball, &mut File::create(archive_path)?)?;
+            return Ok(());
         }
+        publish::upload_tarball("http://127.0.0.1:3000/publish", tarball).await?;
     }
     Ok(())
 }

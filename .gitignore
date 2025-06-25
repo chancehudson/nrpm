@@ -5,3 +5,5 @@ tmp/
 *.tmp
 *.swp
 *.tar
+
+package_data/

@@ -2,5 +2,15 @@
 name = "onyx"
 version = "0.1.0"
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+tempfile = { workspace = true }
+blake3 = { workspace = true }
+
+common = { path = "../common" }
+
+axum = { version = "0.8.4", features = ["http2", "multipart"] }
