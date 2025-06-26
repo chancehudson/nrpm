@@ -21,11 +21,10 @@ use redb::Value;
 const MAX_UPLOAD_SIZE: usize = 20 * 1024 * 1024;
 const STORAGE_PATH: &'static str = "./package_data";
 
-// auth token keyed to user id, expiration timestamp
+// auth token keyed to expiration timestamp
 const AUTH_TOKEN_TABLE: TableDefinition<&str, (u128, u64)> = TableDefinition::new("auth_tokens");
-// user id keyed to user document
+// username id keyed to user document
 const USER_TABLE: TableDefinition<u128, User> = TableDefinition::new("users");
-// username keyed to user id
 const USERNAME_USER_ID_TABLE: TableDefinition<&str, u128> =
     TableDefinition::new("username_user_id");
 
