@@ -1,0 +1,13 @@
+[package]
+name = "db"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+server = ["redb", "bincode"]
+
+[dependencies]
+serde = { workspace = true }
+redb = { workspace = true, optional = true }
+
+bincode = { version = "1.0.0", optional = true }

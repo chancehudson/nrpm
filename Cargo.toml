@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 
-members = ["cli", "onyx", "common", "web"]
+members = ["cli", "onyx", "common", "web", "db"]
 
 [workspace.dependencies]
 anyhow = "1.0.98"
@@ -11,6 +11,7 @@ blake3 = "1.8.2"
 tar = "0.4.44"
 tempfile = "3.20.0"
 reqwest = { version = "0.12.20", features = ["multipart", "json"] }
+redb = "2.6.0"
 
 [profile]
 
