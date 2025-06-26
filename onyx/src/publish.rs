@@ -14,6 +14,8 @@ use serde::Deserialize;
 use serde::Serialize;
 use tempfile::tempfile;
 
+use crate::PACKAGE_NAME_TABLE;
+
 use super::AUTH_TOKEN_TABLE;
 use super::OnyxError;
 use super::OnyxState;
@@ -95,8 +97,6 @@ pub async fn publish(
         } else {
             return Err(OnyxError::bad_request("Package does not exist for id!"));
         };
-    } else {
-        // TODO: make sure package_name isn't already in use
     }
 
     // now we're authed, and confirmed to be the author of the package
@@ -132,6 +132,17 @@ pub async fn publish(
     {
         let mut package_table = write.open_table(PACKAGE_TABLE)?;
         let mut version_table = write.open_table(PACKAGE_VERSION_TABLE)?;
+        let mut package_name_table = write.open_table(PACKAGE_NAME_TABLE)?;
+
+        // do the name availability check here to avoid a race condition
+        // (check for name before starting write, another threads takes name, this thread overwrites name)
+        if publish_data.package_id.is_none() {
+            // creating a new package, verify that name is available
+            if let Some(_) = package_name_table.get(publish_data.package_name.as_str())? {
+                return Err(OnyxError::bad_request("Package name is in use!"));
+            }
+        }
+        package_name_table.insert(publish_data.package_name.as_str(), ())?;
 
         // generate a new version id for what is being published
         let version_id = nanoid!();

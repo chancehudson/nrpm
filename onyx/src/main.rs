@@ -10,6 +10,7 @@ use db::PackageModel;
 use db::PackageVersionModel;
 use db::UserModel;
 use redb::Database;
+use redb::Table;
 use redb::TableDefinition;
 use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
@@ -34,6 +35,7 @@ const USER_TABLE: TableDefinition<NanoId, UserModel> = TableDefinition::new("use
 // username keyed to user_id
 const USERNAME_USER_ID_TABLE: TableDefinition<&str, NanoId> =
     TableDefinition::new("username_user_id");
+const PACKAGE_NAME_TABLE: TableDefinition<&str, ()> = TableDefinition::new("package_names");
 const PACKAGE_TABLE: TableDefinition<NanoId, PackageModel> = TableDefinition::new("packages");
 const PACKAGE_VERSION_TABLE: TableDefinition<NanoId, PackageVersionModel> =
     TableDefinition::new("package_versions");
