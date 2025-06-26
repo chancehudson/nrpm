@@ -5,11 +5,11 @@ use axum::response::Json as ResponseJson;
 use bcrypt::DEFAULT_COST;
 use bcrypt::hash;
 use common::timestamp;
+use db::LoginRequest;
+use db::LoginResponse;
 use db::UserModel;
 use nanoid::nanoid;
 use redb::ReadableTable;
-use serde::Deserialize;
-use serde::Serialize;
 
 use crate::USER_TABLE;
 use crate::USERNAME_USER_ID_TABLE;
@@ -18,18 +18,6 @@ use super::AUTH_TOKEN_TABLE;
 use super::OnyxError;
 use super::OnyxState;
 
-#[derive(Serialize, Deserialize)]
-pub struct LoginRequest {
-    pub username: String,
-    pub password: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct LoginResponse {
-    pub user: UserModel,
-    pub token: String,
-    pub expires_at: u64,
-}
 pub async fn login(
     State(state): State<OnyxState>,
     Json(payload): Json<LoginRequest>,

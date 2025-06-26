@@ -17,6 +17,7 @@ use tower_http::cors::CorsLayer;
 
 mod auth;
 mod error;
+mod list_packages;
 mod publish;
 
 pub use error::OnyxError;
@@ -65,6 +66,7 @@ async fn main() -> Result<()> {
         .allow_headers(Any);
     let app = Router::new()
         .route("/", get(root))
+        .route("/packages", get(list_packages::list_packages))
         .route(
             "/publish",
             post(publish::publish).layer(DefaultBodyLimit::max(MAX_UPLOAD_SIZE)),

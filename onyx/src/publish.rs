@@ -49,7 +49,10 @@ pub async fn publish(
             }
             "publish_data" => {
                 let bytes = field.bytes().await?;
-                publish_data = Some(bincode::deserialize(&bytes)?);
+                publish_data = Some(
+                    bincode::deserialize(&bytes)
+                        .map_err(|_| OnyxError::bad_request("Failed to decode publish data!"))?,
+                );
             }
             _ => {}
         }
