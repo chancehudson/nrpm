@@ -35,6 +35,8 @@ impl_error_from!(redb::TransactionError);
 impl_error_from!(redb::TableError);
 impl_error_from!(redb::CommitError);
 impl_error_from!(bcrypt::BcryptError);
+impl_error_from!(blake3::HexError);
+impl_error_from!(Box<bincode::ErrorKind>);
 
 impl From<std::io::Error> for OnyxError {
     fn from(value: std::io::Error) -> Self {

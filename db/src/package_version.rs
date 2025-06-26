@@ -2,16 +2,18 @@ use serde::Deserialize;
 use serde::Serialize;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct VersionModel {
+pub struct PackageVersionModel {
     pub id: u128,
     pub name: String,
     pub author_id: u128,
     pub package_id: u128,
+    pub hash: [u8; 32],
+    pub created_at: u64,
 }
 
 #[cfg(feature = "server")]
-impl redb::Value for VersionModel {
-    type SelfType<'a> = VersionModel;
+impl redb::Value for PackageVersionModel {
+    type SelfType<'a> = PackageVersionModel;
     type AsBytes<'a> = Vec<u8>;
 
     fn fixed_width() -> Option<usize> {

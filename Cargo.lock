@@ -1822,6 +1822,7 @@ dependencies = [
  "anyhow",
  "axum",
  "bcrypt",
+ "bincode",
  "blake3",
  "common",
  "db",

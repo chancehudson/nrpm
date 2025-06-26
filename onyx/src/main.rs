@@ -6,8 +6,11 @@ use axum::extract::DefaultBodyLimit;
 use axum::routing::get;
 use axum::routing::post;
 use common::timestamp;
+use db::PackageModel;
+use db::PackageVersionModel;
 use db::UserModel;
 use redb::Database;
+use redb::ReadableTable;
 use redb::TableDefinition;
 use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
@@ -24,10 +27,28 @@ const STORAGE_PATH: &'static str = "./package_data";
 
 // auth token keyed to expiration timestamp
 const AUTH_TOKEN_TABLE: TableDefinition<&str, (u128, u64)> = TableDefinition::new("auth_tokens");
-// username id keyed to user document
+// user_id keyed to user document
 const USER_TABLE: TableDefinition<u128, UserModel> = TableDefinition::new("users");
+// username keyed to user_id
 const USERNAME_USER_ID_TABLE: TableDefinition<&str, u128> =
     TableDefinition::new("username_user_id");
+const PACKAGE_TABLE: TableDefinition<u128, PackageModel> = TableDefinition::new("packages");
+const PACKAGE_VERSION_TABLE: TableDefinition<u128, PackageVersionModel> =
+    TableDefinition::new("package_versions");
+
+pub fn rand_key<V>(table: &redb::Table<u128, V>) -> Result<u128>
+where
+    V: redb::Value,
+{
+    let mut id: u128;
+    loop {
+        id = rand::random();
+        if table.get(id)?.is_none() {
+            break;
+        }
+    }
+    Ok(id)
+}
 
 #[derive(Clone)]
 struct OnyxState {

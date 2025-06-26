@@ -1,7 +1,7 @@
 mod package;
+mod package_version;
 mod user;
-mod version;
 
 pub use package::PackageModel;
+pub use package_version::PackageVersionModel;
 pub use user::UserModel;
-pub use version::VersionModel;
