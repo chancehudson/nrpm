@@ -8,6 +8,7 @@ use axum::extract::Multipart;
 use axum::extract::State;
 use db::PackageModel;
 use db::PackageVersionModel;
+use nanoid::nanoid;
 use redb::ReadableTable;
 use serde::Deserialize;
 use serde::Serialize;
@@ -21,13 +22,12 @@ use super::AUTH_TOKEN_TABLE;
 use super::OnyxError;
 use super::OnyxState;
 use super::STORAGE_PATH;
-use super::rand_key;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PublishData {
     pub hash: String,
     pub token: String,
-    pub package_id: Option<u128>, // None if creating a new package
+    pub package_id: Option<String>, // None if creating a new package
     pub package_name: String,
     pub version_name: String,
 }
@@ -76,14 +76,14 @@ pub async fn publish(
                 "Publish request contains invalid token!",
             ));
         }
-        user_id
+        user_id.to_string()
     } else {
         return Err(OnyxError::bad_request(
             "Publish request contained invalid token!",
         ));
     };
-    if let Some(package_id) = publish_data.package_id {
-        if let Some(package) = package_table.get(package_id)? {
+    if let Some(package_id) = &publish_data.package_id {
+        if let Some(package) = package_table.get(package_id.as_str())? {
             let package = package.value();
             if package.author_id != user_id {
                 return Err(OnyxError::bad_request("Not authorized!"));
@@ -133,29 +133,29 @@ pub async fn publish(
     let mut version_table = write.open_table(PACKAGE_VERSION_TABLE)?;
 
     // generate a new version id for what is being published
-    let version_id = rand_key(&version_table)?;
+    let version_id = nanoid!();
 
     let package = if let Some(package_id) = publish_data.package_id {
-        let mut package = package_table.get(package_id)?.unwrap().value();
-        package.latest_version_id = version_id;
-        package_table.insert(package_id, package.clone())?;
+        let mut package = package_table.get(package_id.as_str())?.unwrap().value();
+        package.latest_version_id = version_id.clone();
+        package_table.insert(package_id.as_str(), package.clone())?;
         package
     } else {
-        let package_id = rand_key(&package_table)?;
+        let package_id = nanoid!();
         let package = PackageModel {
             id: package_id,
             name: publish_data.package_name,
-            author_id: user_id,
-            latest_version_id: version_id,
+            author_id: user_id.clone(),
+            latest_version_id: version_id.clone(),
         };
-        package_table.insert(package_id, package.clone())?;
+        package_table.insert(package.id.as_str(), package.clone())?;
         package
     };
 
     version_table.insert(
-        version_id,
+        version_id.as_str(),
         PackageVersionModel {
-            id: version_id,
+            id: version_id.clone(),
             name: publish_data.version_name,
             author_id: user_id,
             package_id: package.id,

@@ -3,10 +3,10 @@ use serde::Serialize;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PackageModel {
-    pub id: u128,
+    pub id: String,
     pub name: String,
-    pub author_id: u128,
-    pub latest_version_id: u128,
+    pub author_id: String,
+    pub latest_version_id: String,
 }
 
 #[cfg(feature = "server")]
@@ -22,14 +22,14 @@ impl redb::Value for PackageModel {
     where
         Self: 'a,
     {
-        bincode::deserialize(data).expect("Failed to deserialize User")
+        bincode::deserialize(data).expect("Failed to deserialize PackageModel")
     }
 
     fn as_bytes<'a, 'b: 'a>(value: &'a Self::SelfType<'b>) -> Self::AsBytes<'a> {
-        bincode::serialize(value).expect("Failed to serialize User")
+        bincode::serialize(value).expect("Failed to serialize PackageModel")
     }
 
     fn type_name() -> redb::TypeName {
-        redb::TypeName::new("User")
+        redb::TypeName::new("PackageModel")
     }
 }

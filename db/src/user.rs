@@ -3,7 +3,7 @@ use serde::Serialize;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct UserModel {
-    pub id: u128,
+    pub id: String,
     pub username: String,
     pub created_at: u64,
     pub password_hash: String,
