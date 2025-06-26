@@ -15,9 +15,9 @@ tokio = { workspace = true }
 blake3 = { workspace = true }
 tar = { workspace = true }
 tempfile = { workspace = true }
+reqwest = { workspace = true }
 
 common = { path = "../common" }
 
 ignore = "0.4.23"
 clap = "4.5.40"
-reqwest = { version = "0.12.20", features = ["multipart", "json"] }

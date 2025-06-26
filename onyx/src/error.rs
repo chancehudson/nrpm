@@ -17,6 +17,25 @@ impl OnyxError {
     }
 }
 
+macro_rules! impl_error_from {
+    ($error_type:ty) => {
+        impl From<$error_type> for OnyxError {
+            fn from(value: $error_type) -> Self {
+                Self {
+                    message: Some(value.to_string()),
+                    status_code: StatusCode::INTERNAL_SERVER_ERROR,
+                }
+            }
+        }
+    };
+}
+
+impl_error_from!(redb::StorageError);
+impl_error_from!(redb::TransactionError);
+impl_error_from!(redb::TableError);
+impl_error_from!(redb::CommitError);
+impl_error_from!(bcrypt::BcryptError);
+
 impl From<std::io::Error> for OnyxError {
     fn from(value: std::io::Error) -> Self {
         Self {

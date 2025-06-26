@@ -7,3 +7,5 @@ tmp/
 *.tar
 
 package_data/
+
+*.redb

@@ -14,3 +14,9 @@ blake3 = { workspace = true }
 common = { path = "../common" }
 
 axum = { version = "0.8.4", features = ["http2", "multipart"] }
+redb = "2.6.0"
+nanoid = "0.4.0"
+bincode = "1.0.0"
+rand = "0.9.1"
+bcrypt = "0.17.0"
+tower-http = { version = "0.6.6", features = ["cors"] }
