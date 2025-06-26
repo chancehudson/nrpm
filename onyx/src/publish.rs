@@ -14,14 +14,13 @@ use serde::Deserialize;
 use serde::Serialize;
 use tempfile::tempfile;
 
-use crate::PACKAGE_TABLE;
-use crate::PACKAGE_VERSION_TABLE;
-use crate::timestamp;
-
 use super::AUTH_TOKEN_TABLE;
 use super::OnyxError;
 use super::OnyxState;
+use super::PACKAGE_TABLE;
+use super::PACKAGE_VERSION_TABLE;
 use super::STORAGE_PATH;
+use super::timestamp;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PublishData {
@@ -96,8 +95,9 @@ pub async fn publish(
         } else {
             return Err(OnyxError::bad_request("Package does not exist for id!"));
         };
+    } else {
+        // TODO: make sure package_name isn't already in use
     }
-    drop(read);
 
     // now we're authed, and confirmed to be the author of the package
     // let's examine the provided tarball
@@ -129,43 +129,41 @@ pub async fn publish(
 
     // now write our package to the db
     let write = state.db.begin_write()?;
-    let mut package_table = write.open_table(PACKAGE_TABLE)?;
-    let mut version_table = write.open_table(PACKAGE_VERSION_TABLE)?;
+    {
+        let mut package_table = write.open_table(PACKAGE_TABLE)?;
+        let mut version_table = write.open_table(PACKAGE_VERSION_TABLE)?;
 
-    // generate a new version id for what is being published
-    let version_id = nanoid!();
+        // generate a new version id for what is being published
+        let version_id = nanoid!();
 
-    let package = if let Some(package_id) = publish_data.package_id {
-        let mut package = package_table.get(package_id.as_str())?.unwrap().value();
-        package.latest_version_id = version_id.clone();
-        package_table.insert(package_id.as_str(), package.clone())?;
-        package
-    } else {
-        let package_id = nanoid!();
-        let package = PackageModel {
-            id: package_id,
-            name: publish_data.package_name,
-            author_id: user_id.clone(),
-            latest_version_id: version_id.clone(),
+        let package = if let Some(package_id) = publish_data.package_id {
+            let mut package = package_table.get(package_id.as_str())?.unwrap().value();
+            package.latest_version_id = version_id.clone();
+            package_table.insert(package_id.as_str(), package.clone())?;
+            package
+        } else {
+            let package = PackageModel {
+                id: nanoid!(),
+                name: publish_data.package_name,
+                author_id: user_id.clone(),
+                latest_version_id: version_id.clone(),
+            };
+            package_table.insert(package.id.as_str(), package.clone())?;
+            package
         };
-        package_table.insert(package.id.as_str(), package.clone())?;
-        package
-    };
 
-    version_table.insert(
-        version_id.as_str(),
-        PackageVersionModel {
-            id: version_id.clone(),
-            name: publish_data.version_name,
-            author_id: user_id,
-            package_id: package.id,
-            hash: *actual_hash.as_bytes(),
-            created_at: timestamp(),
-        },
-    )?;
-
-    drop(package_table);
-    drop(version_table);
+        version_table.insert(
+            version_id.as_str(),
+            PackageVersionModel {
+                id: version_id.clone(),
+                name: publish_data.version_name,
+                author_id: user_id,
+                package_id: package.id,
+                hash: *actual_hash.as_bytes(),
+                created_at: timestamp(),
+            },
+        )?;
+    }
     write.commit()?;
 
     Ok(())
