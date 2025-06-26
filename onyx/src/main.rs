@@ -10,7 +10,7 @@ use db::PackageModel;
 use db::PackageVersionModel;
 use db::UserModel;
 use redb::Database;
-use redb::Table;
+use redb::MultimapTableDefinition;
 use redb::TableDefinition;
 use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
@@ -35,10 +35,20 @@ const USER_TABLE: TableDefinition<NanoId, UserModel> = TableDefinition::new("use
 // username keyed to user_id
 const USERNAME_USER_ID_TABLE: TableDefinition<&str, NanoId> =
     TableDefinition::new("username_user_id");
-const PACKAGE_NAME_TABLE: TableDefinition<&str, ()> = TableDefinition::new("package_names");
+
 const PACKAGE_TABLE: TableDefinition<NanoId, PackageModel> = TableDefinition::new("packages");
-const PACKAGE_VERSION_TABLE: TableDefinition<NanoId, PackageVersionModel> =
-    TableDefinition::new("package_versions");
+// used to ensure package names are unique
+// TODO: sort by semver ordering for efficient latest version lookups
+const PACKAGE_NAME_TABLE: TableDefinition<&str, ()> = TableDefinition::new("package_names");
+// used to prevent multiple versions with the same name for a single package
+// (package_id, version_name) keyed to ()
+const PACKAGE_VERSION_NAME_TABLE: TableDefinition<(NanoId, &str), ()> =
+    TableDefinition::new("package_version_name");
+// package_id keyed to many versions
+const PACKAGE_VERSION_TABLE: MultimapTableDefinition<NanoId, NanoId> =
+    MultimapTableDefinition::new("package_versions");
+const VERSION_TABLE: TableDefinition<NanoId, PackageVersionModel> =
+    TableDefinition::new("versions");
 
 #[derive(Clone)]
 struct OnyxState {

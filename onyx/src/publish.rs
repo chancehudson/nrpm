@@ -15,6 +15,8 @@ use serde::Serialize;
 use tempfile::tempfile;
 
 use crate::PACKAGE_NAME_TABLE;
+use crate::PACKAGE_VERSION_NAME_TABLE;
+use crate::VERSION_TABLE;
 
 use super::AUTH_TOKEN_TABLE;
 use super::OnyxError;
@@ -131,11 +133,13 @@ pub async fn publish(
     let write = state.db.begin_write()?;
     {
         let mut package_table = write.open_table(PACKAGE_TABLE)?;
-        let mut version_table = write.open_table(PACKAGE_VERSION_TABLE)?;
+        let mut package_version_table = write.open_multimap_table(PACKAGE_VERSION_TABLE)?;
+        let mut version_table = write.open_table(VERSION_TABLE)?;
         let mut package_name_table = write.open_table(PACKAGE_NAME_TABLE)?;
+        let mut package_version_name_table = write.open_table(PACKAGE_VERSION_NAME_TABLE)?;
 
         // do the name availability check here to avoid a race condition
-        // (check for name before starting write, another threads takes name, this thread overwrites name)
+        // e.g. check for name before starting write, another threads takes name, this thread overwrites name
         if publish_data.package_id.is_none() {
             // creating a new package, verify that name is available
             if let Some(_) = package_name_table.get(publish_data.package_name.as_str())? {
@@ -148,6 +152,7 @@ pub async fn publish(
         let version_id = nanoid!();
 
         let package = if let Some(package_id) = publish_data.package_id {
+            // we confimed the package exists above so unwrap is safe here
             let mut package = package_table.get(package_id.as_str())?.unwrap().value();
             package.latest_version_id = version_id.clone();
             package_table.insert(package_id.as_str(), package.clone())?;
@@ -163,6 +168,21 @@ pub async fn publish(
             package
         };
 
+        // make sure the version name is unique
+        if let Some(_) = package_version_name_table
+            .get((package.id.as_str(), publish_data.version_name.as_str()))?
+        {
+            return Err(OnyxError::bad_request(&format!(
+                "Version {} already exists for package {}",
+                publish_data.version_name, package.name
+            )));
+        }
+
+        package_version_name_table.insert(
+            (package.id.as_str(), publish_data.version_name.as_str()),
+            (),
+        )?;
+        package_version_table.insert(package.id.as_str(), version_id.as_str())?;
         version_table.insert(
             version_id.as_str(),
             PackageVersionModel {
