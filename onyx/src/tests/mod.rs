@@ -4,19 +4,17 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
+use common::OnyxApi;
+use common::api_types::LoginRequest;
+use common::api_types::LoginResponse;
 use common::create_tarball;
 use common::hash_tarball;
-use common::timestamp;
-use db::LoginRequest;
-use db::LoginResponse;
 use nanoid::nanoid;
-use reqwest::multipart;
-use serde_json::json;
 use tempfile::TempDir;
 use tempfile::tempfile;
 
-use crate::publish::PublishData;
-use crate::publish::PublishResponse;
+use common::api_types::PublishData;
+use common::api_types::PublishResponse;
 
 use super::OnyxState;
 use super::build_server;
@@ -25,6 +23,7 @@ use super::create_tables;
 pub struct OnyxTestState {
     pub url: String,
     pub state: OnyxState,
+    pub api: OnyxApi,
 
     #[allow(dead_code)]
     tmp_handles: Vec<TempDir>,
@@ -51,55 +50,15 @@ impl OnyxTestState {
         });
         tokio::time::sleep(Duration::from_millis(500)).await;
 
+        let url = format!("http://{}", addr);
         Ok(Self {
-            url: format!("http://{}", addr),
+            api: OnyxApi::new(url.clone())?,
+            url,
             state,
 
             // used to keep handles in memory to prevent directory removal until end of program
             tmp_handles: vec![temp_dir, storage_dir],
         })
-    }
-
-    /// Generate a user with random username and password. Returns
-    /// the `UserModel` and the password.
-    pub async fn signup(&self, request: Option<LoginRequest>) -> Result<(LoginResponse, String)> {
-        let request = request.unwrap_or(LoginRequest {
-            username: nanoid!(),
-            password: nanoid!(),
-        });
-        let password = request.password.clone();
-        let response = reqwest::Client::new()
-            .post(format!("{}/signup", self.url))
-            .json(&json!(request))
-            .send()
-            .await?;
-        if response.status().is_success() {
-            let data: LoginResponse = response.json().await?;
-
-            assert!(data.user.created_at.abs_diff(timestamp()) < 10); // timestamp should be sane
-
-            Ok((data, password))
-        } else {
-            anyhow::bail!("{}", response.text().await?);
-        }
-    }
-
-    pub async fn login(&self, request: Option<LoginRequest>) -> Result<LoginResponse> {
-        let request = request.unwrap_or(LoginRequest {
-            username: nanoid!(),
-            password: nanoid!(),
-        });
-        let response = reqwest::Client::new()
-            .post(format!("{}/login", self.url))
-            .json(&json!(request))
-            .send()
-            .await?;
-        if response.status().is_success() {
-            let data: LoginResponse = response.json().await?;
-            Ok(data)
-        } else {
-            anyhow::bail!("{}", response.text().await?);
-        }
     }
 
     // Test helper to create a test tarball
@@ -118,6 +77,26 @@ impl OnyxTestState {
         Ok((tarball_bytes, hash))
     }
 
+    /// Generate a user with random username and password. Returns
+    /// the `UserModel` and the password.
+    pub async fn signup(&self, request: Option<LoginRequest>) -> Result<(LoginResponse, String)> {
+        let request = request.unwrap_or(LoginRequest {
+            username: nanoid!(),
+            password: nanoid!(),
+        });
+        let password = request.password.clone();
+        let login = self.api.signup(request).await?;
+        Ok((login, password))
+    }
+
+    pub async fn login(&self, request: Option<LoginRequest>) -> Result<LoginResponse> {
+        let request = request.unwrap_or(LoginRequest {
+            username: nanoid!(),
+            password: nanoid!(),
+        });
+        self.api.login(request).await
+    }
+
     pub async fn publish(
         &self,
         request: Option<PublishData>,
@@ -130,27 +109,6 @@ impl OnyxTestState {
             package_name: nanoid!(),
             version_name: nanoid!(),
         });
-        let form = multipart::Form::new()
-            .part(
-                "tarball",
-                multipart::Part::bytes(tarball.0.clone())
-                    .file_name("package.tar")
-                    .mime_str("application/tar")?,
-            )
-            .part(
-                "publish_data",
-                multipart::Part::bytes(bincode::serialize(&data)?),
-            );
-        let response = reqwest::Client::new()
-            .post(format!("{}/publish", self.url))
-            .multipart(form)
-            .send()
-            .await?;
-        if response.status().is_success() {
-            let data: PublishResponse = response.json().await?;
-            Ok(data)
-        } else {
-            anyhow::bail!("{}", response.text().await?);
-        }
+        self.api.publish(data, tarball.0).await
     }
 }

@@ -9,6 +9,7 @@ serde = { workspace = true }
 reqwest = { workspace = true }
 
 db = { path = "../db" }
+common = { path = "../common" }
 
 dioxus = { version = "0.6.3", features = ["router"] }
 serde_json = "1.0.140"

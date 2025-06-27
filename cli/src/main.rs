@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use clap::Arg;
 use clap::ArgAction;
 use clap::Command;
+use common::OnyxApi;
+use tempfile::tempfile;
 use tokio;
 
 mod publish;
@@ -12,6 +14,8 @@ mod publish;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let matches = cli().get_matches();
+    let api = OnyxApi::default();
+    // let login = LoginResponse { user: (), token: (), expires_at: () }
     if let Some(matches) = matches.subcommand_matches("publish") {
         let cwd = std::env::current_dir()?;
         let path = matches
@@ -25,12 +29,12 @@ async fn main() -> anyhow::Result<()> {
                 }
             })
             .unwrap_or(cwd);
-        let tarball = common::create_tarball(path)?;
+        let tarball = common::create_tarball(path, tempfile()?)?;
         if let Some(archive_path) = matches.get_one::<String>("archive") {
             let mut tarball = tarball;
             io::copy(&mut tarball, &mut File::create(archive_path)?)?;
         } else {
-            publish::upload_tarball("http://127.0.0.1:3000/publish", tarball).await?;
+            publish::upload_tarball(login, &api, tarball).await?;
         }
     }
     Ok(())

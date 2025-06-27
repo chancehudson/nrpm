@@ -1,7 +1,8 @@
+use common::OnyxApi;
+use common::api_types::LoginRequest;
 use dioxus::prelude::*;
 use gloo_storage::LocalStorage;
 use gloo_storage::Storage;
-use serde_json::json;
 
 use crate::Route;
 
@@ -35,34 +36,21 @@ pub fn AuthView() -> Element {
             loading.set(true);
             status.set("Logging in...".to_string());
 
-            let client = reqwest::Client::new();
-            let payload = json!({
-                "username": username_val,
-                "password": password_val
-            });
-
-            match client
-                .post("http://localhost:3000/login")
-                .json(&payload)
-                .send()
+            let api = OnyxApi::default();
+            match api
+                .login(LoginRequest {
+                    username: username_val,
+                    password: password_val,
+                })
                 .await
             {
-                Ok(response) => {
-                    if response.status().is_success() {
-                        status.set("Login successful!".to_string());
-                        let res: db::LoginResponse = response.json().await.unwrap();
-                        save_token(&res.token).unwrap();
-                        auth_maybe.set(Some(res.token));
-                    } else {
-                        let status_code = response.status();
-                        let error_text = response.text().await.unwrap_or_default();
-                        status.set(format!("Login failed: {} - {}", status_code, error_text));
-                    }
+                Ok(login) => {
+                    status.set("Login successful!".to_string());
+                    save_token(&login.token).unwrap();
+                    auth_maybe.set(Some(login.token));
                 }
-                Err(e) => {
-                    status.set(format!("Login error: {}", e));
-                }
-            }
+                Err(e) => status.set(format!("Login failed: {e}")),
+            };
 
             loading.set(false);
         });
@@ -78,34 +66,21 @@ pub fn AuthView() -> Element {
             loading.set(true);
             status.set("Signing up...".to_string());
 
-            let client = reqwest::Client::new();
-            let payload = json!({
-                "username": username_val,
-                "password": password_val
-            });
-
-            match client
-                .post("http://localhost:3000/signup")
-                .json(&payload)
-                .send()
+            let api = OnyxApi::default();
+            match api
+                .signup(LoginRequest {
+                    username: username_val,
+                    password: password_val,
+                })
                 .await
             {
-                Ok(response) => {
-                    if response.status().is_success() {
-                        status.set("Signup successful!".to_string());
-                        let res: db::LoginResponse = response.json().await.unwrap();
-                        save_token(&res.token).unwrap();
-                        auth_maybe.set(Some(res.token));
-                    } else {
-                        let status_code = response.status();
-                        let error_text = response.text().await.unwrap_or_default();
-                        status.set(format!("Signup failed: {} - {}", status_code, error_text));
-                    }
+                Ok(login) => {
+                    status.set("Signup successful!".to_string());
+                    save_token(&login.token).unwrap();
+                    auth_maybe.set(Some(login.token));
                 }
-                Err(e) => {
-                    status.set(format!("Signup error: {}", e));
-                }
-            }
+                Err(e) => status.set(format!("Signup failed: {e}")),
+            };
 
             loading.set(false);
         });

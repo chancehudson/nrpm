@@ -7,12 +7,12 @@ use anyhow::Result;
 use axum::extract::Multipart;
 use axum::extract::State;
 use axum::response::Json as ResponseJson;
+use common::api_types::PublishData;
+use common::api_types::PublishResponse;
 use db::PackageModel;
 use db::PackageVersionModel;
 use nanoid::nanoid;
 use redb::ReadableTable;
-use serde::Deserialize;
-use serde::Serialize;
 use tempfile::tempfile;
 
 use crate::PACKAGE_NAME_TABLE;
@@ -25,20 +25,6 @@ use super::OnyxState;
 use super::PACKAGE_TABLE;
 use super::PACKAGE_VERSION_TABLE;
 use super::timestamp;
-
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
-pub struct PublishData {
-    pub hash: String,
-    pub token: String,
-    pub package_id: Option<String>, // None if creating a new package
-    pub package_name: String,
-    pub version_name: String,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
-pub struct PublishResponse {
-    pub package_id: String,
-}
 
 pub async fn publish(
     State(state): State<OnyxState>,

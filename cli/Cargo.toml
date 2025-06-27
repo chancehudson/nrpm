@@ -20,3 +20,4 @@ reqwest = { workspace = true }
 common = { path = "../common" }
 
 clap = "4.5.40"
+dialoguer = "0.11.0"
