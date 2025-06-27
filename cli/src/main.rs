@@ -1,22 +1,27 @@
 use std::fs::File;
 use std::io;
 use std::path::PathBuf;
+use std::time::Duration;
 
+use anyhow::Result;
 use clap::Arg;
 use clap::ArgAction;
 use clap::Command;
 use common::OnyxApi;
+use common::api_types::LoginResponse;
+use nanoid::nanoid;
 use tempfile::tempfile;
 use tokio;
 
 mod publish;
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Result<()> {
     let matches = cli().get_matches();
     let api = OnyxApi::default();
     // let login = LoginResponse { user: (), token: (), expires_at: () }
     if let Some(matches) = matches.subcommand_matches("publish") {
+        let login = attempt_auth().await?;
         let cwd = std::env::current_dir()?;
         let path = matches
             .get_one::<String>("path")
@@ -38,6 +43,29 @@ async fn main() -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+async fn attempt_auth() -> Result<LoginResponse> {
+    let proposed_token = nanoid!();
+    // we'll create a token and open the web browser
+    open::that(format!(
+        "http://localhost:8080/propose_token?token={proposed_token}"
+    ))?;
+    let api = OnyxApi::default();
+    const MAX_ATTEMPTS: usize = 30;
+    let mut attempts = 0;
+    loop {
+        tokio::time::sleep(Duration::from_millis(1000)).await;
+        match api.auth(proposed_token.clone()).await {
+            Ok(login) => return Ok(login),
+            Err(e) => {
+                attempts += 1;
+                if attempts >= MAX_ATTEMPTS {
+                    anyhow::bail!("Timed out waiting for token to activate!")
+                }
+            }
+        }
+    }
 }
 
 fn cli() -> Command {

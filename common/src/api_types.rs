@@ -4,6 +4,17 @@ use serde::Serialize;
 use db::UserModelSafe;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
+pub struct TokenOnly {
+    pub token: String,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+pub struct ProposeToken {
+    pub token: String,
+    pub proposed_token: String,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct PublishData {
     pub hash: String,
     pub token: String,

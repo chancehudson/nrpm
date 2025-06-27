@@ -3,6 +3,8 @@ use reqwest::multipart;
 use serde_json::json;
 
 use crate::REGISTRY_URL;
+use crate::api_types::ProposeToken;
+use crate::api_types::TokenOnly;
 
 use super::api_types::LoginRequest;
 use super::api_types::LoginResponse;
@@ -24,6 +26,36 @@ impl Default for OnyxApi {
 impl OnyxApi {
     pub fn new(url: String) -> Result<Self> {
         Ok(Self { url })
+    }
+
+    pub async fn auth(&self, token: String) -> Result<LoginResponse> {
+        let response = reqwest::Client::new()
+            .post(format!("{}/auth", self.url))
+            .json(&TokenOnly { token })
+            .send()
+            .await?;
+        if response.status().is_success() {
+            let data: LoginResponse = response.json().await?;
+            Ok(data)
+        } else {
+            anyhow::bail!("{}", response.text().await?);
+        }
+    }
+
+    pub async fn propose_token(&self, proposed_token: String, token: String) -> Result<()> {
+        let response = reqwest::Client::new()
+            .post(format!("{}/propose_token", self.url))
+            .json(&ProposeToken {
+                token,
+                proposed_token,
+            })
+            .send()
+            .await?;
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            anyhow::bail!("{}", response.text().await?);
+        }
     }
 
     /// Generate a user with random username and password. Returns

@@ -22,6 +22,7 @@ mod list_packages;
 mod publish;
 #[cfg(test)]
 mod tests;
+mod user;
 
 pub use error::OnyxError;
 
@@ -105,6 +106,8 @@ fn build_server(state: OnyxState) -> axum::Router {
         )
         .route("/signup", post(auth::signup))
         .route("/login", post(auth::login))
+        .route("/auth", post(user::current_auth))
+        .route("/propose_token", post(user::propose_token))
         .with_state(state)
         .layer(cors)
 }

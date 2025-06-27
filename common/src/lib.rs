@@ -9,7 +9,7 @@ pub use tarball::hash_tarball;
 #[cfg(debug_assertions)]
 pub const REGISTRY_URL: &'static str = "http://127.0.0.1:3000";
 #[cfg(not(debug_assertions))]
-pub const REGISTRY_URL: &'static str = "https://nrpm.io";
+pub const REGISTRY_URL: &'static str = "https://api.nrpm.io";
 
 pub fn timestamp() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
