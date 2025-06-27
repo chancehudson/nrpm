@@ -11,7 +11,6 @@ use db::PackageModel;
 use db::PackageVersionModel;
 use nanoid::nanoid;
 use redb::ReadableTable;
-use reqwest::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;
 use tempfile::tempfile;

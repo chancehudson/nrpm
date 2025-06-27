@@ -4,7 +4,6 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use ignore::WalkBuilder;
-use tempfile::tempfile;
 
 mod checksum;
 

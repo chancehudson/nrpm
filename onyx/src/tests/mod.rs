@@ -1,6 +1,5 @@
 use std::io::Read;
 use std::io::Seek;
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -25,8 +24,9 @@ use super::create_tables;
 
 pub struct OnyxTestState {
     pub url: String,
-    pub tmpdir: PathBuf,
     pub state: OnyxState,
+
+    #[allow(dead_code)]
     tmp_handles: Vec<TempDir>,
 }
 
@@ -54,7 +54,6 @@ impl OnyxTestState {
         Ok(Self {
             url: format!("http://{}", addr),
             state,
-            tmpdir: temp_dir.path().to_path_buf(),
 
             // used to keep handles in memory to prevent directory removal until end of program
             tmp_handles: vec![temp_dir, storage_dir],

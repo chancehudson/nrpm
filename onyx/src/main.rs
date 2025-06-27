@@ -13,7 +13,6 @@ use db::UserModel;
 use redb::Database;
 use redb::MultimapTableDefinition;
 use redb::TableDefinition;
-use tempfile::TempDir;
 use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
 
