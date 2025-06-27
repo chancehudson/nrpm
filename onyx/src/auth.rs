@@ -153,18 +153,15 @@ mod tests {
     async fn fail_signup_short_password() -> Result<()> {
         let test = OnyxTestState::new().await?;
         const TEST_PASSWORD_LEN: usize = MIN_PASSWORD_LEN - 1;
-        if let Err(e) = test
+        let e = test
             .signup(Some(LoginRequest {
                 username: nanoid!(),
                 password: nanoid!(TEST_PASSWORD_LEN),
             }))
             .await
-        {
-            assert_eq!(e.to_string(), "password must be more than 10 characters");
-            Ok(())
-        } else {
-            panic!();
-        }
+            .unwrap_err();
+        assert_eq!(e.to_string(), "password must be more than 10 characters");
+        Ok(())
     }
 
     #[tokio::test]
@@ -172,12 +169,9 @@ mod tests {
         let test = OnyxTestState::new().await?;
 
         // test.login(Some(LoginRequest { username: "not_a_user", password: "not_a_password" }))
-        if let Err(e) = test.login(None).await {
-            assert_eq!(e.to_string(), "username not registered");
-            Ok(())
-        } else {
-            panic!();
-        }
+        let e = test.login(None).await.unwrap_err();
+        assert_eq!(e.to_string(), "username not registered");
+        Ok(())
     }
 
     #[tokio::test]
@@ -185,18 +179,15 @@ mod tests {
         let test = OnyxTestState::new().await?;
         let (login, _password) = test.signup(None).await?;
 
-        if let Err(e) = test
+        let e = test
             .login(Some(LoginRequest {
                 username: login.user.username,
                 password: nanoid!(),
             }))
             .await
-        {
-            assert_eq!(e.to_string(), "bad password");
-            Ok(())
-        } else {
-            panic!();
-        }
+            .unwrap_err();
+        assert_eq!(e.to_string(), "bad password");
+        Ok(())
     }
 
     #[tokio::test]
@@ -213,17 +204,14 @@ mod tests {
 
         assert_eq!(login.user.username, username);
 
-        if let Err(e) = test
+        let e = test
             .signup(Some(LoginRequest {
                 username: login.user.username,
                 password,
             }))
             .await
-        {
-            assert_eq!(e.to_string(), "username is already in use");
-            Ok(())
-        } else {
-            panic!();
-        }
+            .unwrap_err();
+        assert_eq!(e.to_string(), "username is already in use");
+        Ok(())
     }
 }

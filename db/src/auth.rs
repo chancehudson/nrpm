@@ -9,7 +9,7 @@ pub struct LoginRequest {
     pub password: String,
 }
 
-#[derive(Serialize, Deserialize, PartialEq)]
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct LoginResponse {
     pub user: UserModelSafe,
     pub token: String,

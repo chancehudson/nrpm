@@ -235,12 +235,9 @@ mod tests {
 
         let mut publish_data = PublishData::default();
         publish_data.hash = tarball.1.to_string();
-        if let Err(e) = test.publish(Some(publish_data), tarball).await {
-            assert_eq!(e.to_string(), "Publish request contains invalid token!");
-            Ok(())
-        } else {
-            panic!();
-        }
+        let e = test.publish(Some(publish_data), tarball).await.unwrap_err();
+        assert_eq!(e.to_string(), "Publish request contains invalid token!");
+        Ok(())
     }
 
     #[tokio::test]
@@ -269,15 +266,42 @@ mod tests {
         let mut publish_data = PublishData::default();
         publish_data.hash = hash.to_string();
         publish_data.token = expired_token;
-        if let Err(e) = test
+        let e = test
             .publish(Some(publish_data), (tarball_bytes, hash))
             .await
-        {
-            assert_eq!(e.to_string(), "Publish request contains invalid token!");
-            Ok(())
-        } else {
-            panic!();
-        }
+            .unwrap_err();
+        assert_eq!(e.to_string(), "Publish request contains invalid token!");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn fail_publish_deformed_data() -> Result<()> {
+        let test = OnyxTestState::new().await?;
+        let (tarball_bytes, _hash) = OnyxTestState::create_test_tarball(None)?;
+
+        let form = multipart::Form::new()
+            .part(
+                "tarball",
+                multipart::Part::bytes(tarball_bytes.clone())
+                    .file_name("package.tar")
+                    .mime_str("application/tar")?,
+            )
+            .part(
+                "publish_data",
+                multipart::Part::bytes("somebaddata".as_bytes()),
+            );
+
+        let response = reqwest::Client::new()
+            .post(format!("{}/publish", test.url))
+            .multipart(form)
+            .send()
+            .await?;
+
+        assert_eq!(response.status().is_success(), false);
+        let e = response.text().await?;
+        assert_eq!(e.to_string(), "Failed to decode publish data!");
+
+        Ok(())
     }
 
     #[tokio::test]
@@ -369,15 +393,12 @@ mod tests {
         let mut data = data;
         data.token = login2.token;
 
-        if let Err(e) = test.publish(Some(data), tarball).await {
-            assert!(
-                e.to_string()
-                    .starts_with("Package with hash already exists")
-            );
-            Ok(())
-        } else {
-            panic!();
-        }
+        let e = test.publish(Some(data), tarball).await.unwrap_err();
+        assert!(
+            e.to_string()
+                .starts_with("Package with hash already exists")
+        );
+        Ok(())
     }
 
     #[tokio::test]
@@ -403,12 +424,9 @@ mod tests {
         data.token = login2.token;
         data.hash = tarball.1.to_string();
 
-        if let Err(e) = test.publish(Some(data), tarball).await {
-            assert_eq!(e.to_string(), "Package name is already in use!");
-            Ok(())
-        } else {
-            panic!();
-        }
+        let e = test.publish(Some(data), tarball).await.unwrap_err();
+        assert_eq!(e.to_string(), "Package name is already in use!");
+        Ok(())
     }
 
     #[tokio::test]
@@ -436,12 +454,9 @@ mod tests {
         data.hash = tarball.1.to_string();
         data.package_id = Some(package_id);
 
-        if let Err(e) = test.publish(Some(data), tarball).await {
-            assert_eq!(e.to_string(), "Not the package author!");
-            Ok(())
-        } else {
-            panic!();
-        }
+        let e = test.publish(Some(data), tarball).await.unwrap_err();
+        assert_eq!(e.to_string(), "Not the package author!");
+        Ok(())
     }
 
     #[tokio::test]
@@ -468,12 +483,9 @@ mod tests {
         data.package_id = Some(package_id);
         data.package_name = "incorrectname".to_string();
 
-        if let Err(e) = test.publish(Some(data), tarball).await {
-            assert_eq!(e.to_string(), "Package name mismatch in publish request!");
-            Ok(())
-        } else {
-            panic!();
-        }
+        let e = test.publish(Some(data), tarball).await.unwrap_err();
+        assert_eq!(e.to_string(), "Package name mismatch in publish request!");
+        Ok(())
     }
 
     #[tokio::test]
@@ -490,12 +502,9 @@ mod tests {
             version_name: nanoid!(),
         };
 
-        if let Err(e) = test.publish(Some(data), tarball).await {
-            assert_eq!(e.to_string(), "Package does not exist for id!");
-            Ok(())
-        } else {
-            panic!();
-        }
+        let e = test.publish(Some(data), tarball).await.unwrap_err();
+        assert_eq!(e.to_string(), "Package does not exist for id!");
+        Ok(())
     }
 
     #[tokio::test]
@@ -513,12 +522,9 @@ mod tests {
             version_name: nanoid!(),
         };
 
-        if let Err(e) = test.publish(Some(data), tarball).await {
-            assert_eq!(e.to_string(), "Hash mismatch for uploaded tarball!");
-            Ok(())
-        } else {
-            panic!();
-        }
+        let e = test.publish(Some(data), tarball).await.unwrap_err();
+        assert_eq!(e.to_string(), "Hash mismatch for uploaded tarball!");
+        Ok(())
     }
 
     #[tokio::test]
@@ -547,15 +553,12 @@ mod tests {
             version_name,
         };
 
-        if let Err(e) = test.publish(Some(data), tarball).await {
-            assert!(
-                e.to_string()
-                    .starts_with("Version already exists for package!")
-            );
-            Ok(())
-        } else {
-            panic!();
-        }
+        let e = test.publish(Some(data), tarball).await.unwrap_err();
+        assert!(
+            e.to_string()
+                .starts_with("Version already exists for package!")
+        );
+        Ok(())
     }
 
     #[tokio::test]
