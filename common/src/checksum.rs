@@ -30,7 +30,7 @@ where
                 for component in path.components() {
                     match component {
                         Component::Normal(component) => {
-                            println!("{}", component.to_string_lossy());
+                            // println!("{}", component.to_string_lossy());
                             hasher.update(component.as_encoded_bytes());
                         }
                         _ => anyhow::bail!("Non-normal path component detected in tarball"),
@@ -38,7 +38,7 @@ where
                 }
                 let mut str = String::new();
                 entry.read_to_string(&mut str)?;
-                println!("content: {}", str);
+                // println!("content: {}", str);
                 hasher.update_reader(str.as_bytes())?;
                 ordered_files.insert(path, hasher.finalize());
             }

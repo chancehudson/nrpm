@@ -6,10 +6,12 @@ use std::io::Write;
 use anyhow::Result;
 use axum::extract::Multipart;
 use axum::extract::State;
+use axum::response::Json as ResponseJson;
 use db::PackageModel;
 use db::PackageVersionModel;
 use nanoid::nanoid;
 use redb::ReadableTable;
+use reqwest::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;
 use tempfile::tempfile;
@@ -23,7 +25,6 @@ use super::OnyxError;
 use super::OnyxState;
 use super::PACKAGE_TABLE;
 use super::PACKAGE_VERSION_TABLE;
-use super::STORAGE_PATH;
 use super::timestamp;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
@@ -35,10 +36,15 @@ pub struct PublishData {
     pub version_name: String,
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+pub struct PublishResponse {
+    pub package_id: String,
+}
+
 pub async fn publish(
     State(state): State<OnyxState>,
     mut multipart: Multipart,
-) -> Result<(), OnyxError> {
+) -> Result<ResponseJson<PublishResponse>, OnyxError> {
     let mut tarball_data = None;
     let mut publish_data: Option<PublishData> = None;
     while let Some(field) = multipart.next_field().await.unwrap() {
@@ -89,7 +95,7 @@ pub async fn publish(
         if let Some(package) = package_table.get(package_id.as_str())? {
             let package = package.value();
             if package.author_id != user_id {
-                return Err(OnyxError::bad_request("Not authorized!"));
+                return Err(OnyxError::bad_request("Not the package author!"));
             }
             if package.name != publish_data.package_name {
                 return Err(OnyxError::bad_request(
@@ -101,11 +107,11 @@ pub async fn publish(
         };
     }
 
-    println!("sajkhfjakfhka {}", tarball_data.len());
     // now we're authed, and confirmed to be the author of the package
     // let's examine the provided tarball
     let mut tarball = tempfile()?;
     tarball.write_all(&tarball_data)?;
+    tarball.flush()?;
     tarball.sync_all()?;
     tarball.seek(SeekFrom::Start(0))?;
     let actual_hash = common::hash_tarball(&tarball)?;
@@ -117,15 +123,16 @@ pub async fn publish(
         ));
     }
 
-    let storage_path = std::env::current_dir()?.join(STORAGE_PATH);
-    let target_path = storage_path.join(format!("{}.tar", actual_hash.to_string()));
+    let target_path = state
+        .storage_path
+        .join(format!("{}.tar", actual_hash.to_string()));
     if target_path.exists() {
         println!(
             "WARNING: package already exists with hash: {}",
             actual_hash.to_string()
         );
         return Err(OnyxError::bad_request(&format!(
-            "Package with hash {} already exists!",
+            "Package with hash already exists: {}",
             actual_hash.to_string()
         )));
     }
@@ -133,7 +140,7 @@ pub async fn publish(
 
     // now write our package to the db
     let write = state.db.begin_write()?;
-    {
+    let package = {
         let mut package_table = write.open_table(PACKAGE_TABLE)?;
         let mut package_version_table = write.open_multimap_table(PACKAGE_VERSION_TABLE)?;
         let mut version_table = write.open_table(VERSION_TABLE)?;
@@ -175,7 +182,7 @@ pub async fn publish(
             .get((package.id.as_str(), publish_data.version_name.as_str()))?
         {
             return Err(OnyxError::bad_request(&format!(
-                "Version {} already exists for package {}",
+                "Version already exists for package! version_name: {} package_name: {}",
                 publish_data.version_name, package.name
             )));
         }
@@ -191,15 +198,19 @@ pub async fn publish(
                 id: version_id.clone(),
                 name: publish_data.version_name,
                 author_id: user_id,
-                package_id: package.id,
+                package_id: package.id.clone(),
                 hash: *actual_hash.as_bytes(),
                 created_at: timestamp(),
             },
         )?;
-    }
+
+        package
+    };
     write.commit()?;
 
-    Ok(())
+    Ok(ResponseJson(PublishResponse {
+        package_id: package.id,
+    }))
 }
 
 #[cfg(test)]
@@ -220,7 +231,7 @@ mod tests {
     #[tokio::test]
     async fn fail_publish_without_token() -> Result<()> {
         let test = OnyxTestState::new().await?;
-        let tarball = OnyxTestState::create_test_tarball()?;
+        let tarball = OnyxTestState::create_test_tarball(None)?;
 
         let mut publish_data = PublishData::default();
         publish_data.hash = tarball.1.to_string();
@@ -254,7 +265,7 @@ mod tests {
             token
         };
 
-        let (tarball_bytes, hash) = OnyxTestState::create_test_tarball()?;
+        let (tarball_bytes, hash) = OnyxTestState::create_test_tarball(None)?;
         let mut publish_data = PublishData::default();
         publish_data.hash = hash.to_string();
         publish_data.token = expired_token;
@@ -272,7 +283,7 @@ mod tests {
     #[tokio::test]
     async fn fail_publish_without_fields() -> Result<()> {
         let test = OnyxTestState::new().await?;
-        let (tarball_bytes, hash) = OnyxTestState::create_test_tarball()?;
+        let (tarball_bytes, hash) = OnyxTestState::create_test_tarball(None)?;
         let client = reqwest::Client::new();
 
         let mut publish_data = PublishData::default();
@@ -337,11 +348,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn fail_publish_duplicate_package_name() -> Result<()> {
+    async fn fail_publish_duplicate_package_hash() -> Result<()> {
         let test = OnyxTestState::new().await?;
         let (login1, _password) = test.signup(None).await?;
         let (login2, _password) = test.signup(None).await?;
-        let tarball = OnyxTestState::create_test_tarball()?;
+        let tarball = OnyxTestState::create_test_tarball(None)?;
 
         let package_name = nanoid!();
 
@@ -359,10 +370,221 @@ mod tests {
         data.token = login2.token;
 
         if let Err(e) = test.publish(Some(data), tarball).await {
+            assert!(
+                e.to_string()
+                    .starts_with("Package with hash already exists")
+            );
+            Ok(())
+        } else {
+            panic!();
+        }
+    }
+
+    #[tokio::test]
+    async fn fail_publish_duplicate_package_name() -> Result<()> {
+        let test = OnyxTestState::new().await?;
+        let (login1, _password) = test.signup(None).await?;
+        let (login2, _password) = test.signup(None).await?;
+        let tarball = OnyxTestState::create_test_tarball(Some("content1"))?;
+
+        let data = PublishData {
+            hash: tarball.1.to_string(),
+            token: login1.token,
+            package_id: None,
+            package_name: nanoid!(),
+            version_name: nanoid!(),
+        };
+
+        test.publish(Some(data.clone()), tarball.clone()).await?;
+
+        // reuse our data with the same package name but different hash
+        let tarball = OnyxTestState::create_test_tarball(Some("content2"))?;
+        let mut data = data;
+        data.token = login2.token;
+        data.hash = tarball.1.to_string();
+
+        if let Err(e) = test.publish(Some(data), tarball).await {
             assert_eq!(e.to_string(), "Package name is already in use!");
             Ok(())
         } else {
             panic!();
         }
+    }
+
+    #[tokio::test]
+    async fn fail_publish_non_author() -> Result<()> {
+        let test = OnyxTestState::new().await?;
+        let (login1, _password) = test.signup(None).await?;
+        let (login2, _password) = test.signup(None).await?;
+        let tarball = OnyxTestState::create_test_tarball(Some("content1"))?;
+
+        let data = PublishData {
+            hash: tarball.1.to_string(),
+            token: login1.token,
+            package_id: None,
+            package_name: nanoid!(),
+            version_name: nanoid!(),
+        };
+
+        let PublishResponse { package_id } =
+            test.publish(Some(data.clone()), tarball.clone()).await?;
+
+        let tarball = OnyxTestState::create_test_tarball(Some("content2"))?;
+
+        let mut data = data;
+        data.token = login2.token;
+        data.hash = tarball.1.to_string();
+        data.package_id = Some(package_id);
+
+        if let Err(e) = test.publish(Some(data), tarball).await {
+            assert_eq!(e.to_string(), "Not the package author!");
+            Ok(())
+        } else {
+            panic!();
+        }
+    }
+
+    #[tokio::test]
+    async fn fail_publish_name_mismatch() -> Result<()> {
+        let test = OnyxTestState::new().await?;
+        let (login, _password) = test.signup(None).await?;
+        let tarball = OnyxTestState::create_test_tarball(Some("content1"))?;
+
+        let data = PublishData {
+            hash: tarball.1.to_string(),
+            token: login.token,
+            package_id: None,
+            package_name: nanoid!(),
+            version_name: nanoid!(),
+        };
+
+        let PublishResponse { package_id } =
+            test.publish(Some(data.clone()), tarball.clone()).await?;
+
+        let tarball = OnyxTestState::create_test_tarball(Some("content2"))?;
+
+        let mut data = data;
+        data.hash = tarball.1.to_string();
+        data.package_id = Some(package_id);
+        data.package_name = "incorrectname".to_string();
+
+        if let Err(e) = test.publish(Some(data), tarball).await {
+            assert_eq!(e.to_string(), "Package name mismatch in publish request!");
+            Ok(())
+        } else {
+            panic!();
+        }
+    }
+
+    #[tokio::test]
+    async fn fail_publish_bad_package_id() -> Result<()> {
+        let test = OnyxTestState::new().await?;
+        let (login, _password) = test.signup(None).await?;
+        let tarball = OnyxTestState::create_test_tarball(Some("content1"))?;
+
+        let data = PublishData {
+            hash: tarball.1.to_string(),
+            token: login.token,
+            package_id: Some(nanoid!()),
+            package_name: nanoid!(),
+            version_name: nanoid!(),
+        };
+
+        if let Err(e) = test.publish(Some(data), tarball).await {
+            assert_eq!(e.to_string(), "Package does not exist for id!");
+            Ok(())
+        } else {
+            panic!();
+        }
+    }
+
+    #[tokio::test]
+    async fn fail_publish_hash_mismatch() -> Result<()> {
+        let test = OnyxTestState::new().await?;
+        let (login, _password) = test.signup(None).await?;
+        let tarball = OnyxTestState::create_test_tarball(Some("content1"))?;
+        let tarball2 = OnyxTestState::create_test_tarball(Some("content2"))?;
+
+        let data = PublishData {
+            hash: tarball2.1.to_string(),
+            token: login.token,
+            package_id: None,
+            package_name: nanoid!(),
+            version_name: nanoid!(),
+        };
+
+        if let Err(e) = test.publish(Some(data), tarball).await {
+            assert_eq!(e.to_string(), "Hash mismatch for uploaded tarball!");
+            Ok(())
+        } else {
+            panic!();
+        }
+    }
+
+    #[tokio::test]
+    async fn fail_publish_duplicate_version() -> Result<()> {
+        let test = OnyxTestState::new().await?;
+        let (login, _password) = test.signup(None).await?;
+        let tarball = OnyxTestState::create_test_tarball(Some("content1"))?;
+
+        let version_name = nanoid!();
+        let package_name = nanoid!();
+        let data = PublishData {
+            hash: tarball.1.to_string(),
+            token: login.token.clone(),
+            package_id: None,
+            package_name: package_name.clone(),
+            version_name: version_name.clone(),
+        };
+        let PublishResponse { package_id } = test.publish(Some(data), tarball).await?;
+
+        let tarball = OnyxTestState::create_test_tarball(Some("content2"))?;
+        let data = PublishData {
+            hash: tarball.1.to_string(),
+            token: login.token,
+            package_id: Some(package_id),
+            package_name,
+            version_name,
+        };
+
+        if let Err(e) = test.publish(Some(data), tarball).await {
+            assert!(
+                e.to_string()
+                    .starts_with("Version already exists for package!")
+            );
+            Ok(())
+        } else {
+            panic!();
+        }
+    }
+
+    #[tokio::test]
+    async fn publish_package_and_new_version() -> Result<()> {
+        let test = OnyxTestState::new().await?;
+        let (login, _password) = test.signup(None).await?;
+        let tarball = OnyxTestState::create_test_tarball(Some("content1"))?;
+
+        let package_name = nanoid!();
+        let data = PublishData {
+            hash: tarball.1.to_string(),
+            token: login.token.clone(),
+            package_id: None,
+            package_name: package_name.clone(),
+            version_name: nanoid!(),
+        };
+        let PublishResponse { package_id } = test.publish(Some(data), tarball).await?;
+
+        let tarball = OnyxTestState::create_test_tarball(Some("content2"))?;
+        let data = PublishData {
+            hash: tarball.1.to_string(),
+            token: login.token,
+            package_id: Some(package_id.clone()),
+            package_name,
+            version_name: nanoid!(),
+        };
+
+        let r2 = test.publish(Some(data), tarball).await?;
+        assert_eq!(r2.package_id, package_id);
+        Ok(())
     }
 }

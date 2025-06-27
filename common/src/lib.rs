@@ -25,7 +25,7 @@ pub fn timestamp() -> u64 {
 /// This function will look for a .gitignore in all directories and follow it.
 /// Empty directories are not included. Irregular files (symlinks, block devices, etc) are not included.
 /// File permission errors will cause a failure. File paths are stored relative to `path`.
-pub fn create_tarball(path: PathBuf) -> Result<File> {
+pub fn create_tarball(path: PathBuf, tar_file: File) -> Result<File> {
     let path = match path.canonicalize() {
         Ok(p) => p,
         Err(e) => anyhow::bail!("Failed to canonicalize path: {:?} error: {:?}", path, e),
@@ -36,7 +36,6 @@ pub fn create_tarball(path: PathBuf) -> Result<File> {
     if !path.is_dir() {
         anyhow::bail!("Path is not a directory: {:?}", path);
     }
-    let tar_file = tempfile()?;
     let mut archive = tar::Builder::new(tar_file);
     let walker = WalkBuilder::new(&path)
         .git_ignore(true)
@@ -72,6 +71,7 @@ pub fn create_tarball(path: PathBuf) -> Result<File> {
         };
         archive.append_file(relative_path, &mut file)?;
     }
+    archive.finish()?;
     let mut tarball = archive.into_inner()?;
     // reset the file handle for use by caller
     tarball.seek(std::io::SeekFrom::Start(0))?;

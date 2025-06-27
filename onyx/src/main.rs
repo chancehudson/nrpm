@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -12,6 +13,7 @@ use db::UserModel;
 use redb::Database;
 use redb::MultimapTableDefinition;
 use redb::TableDefinition;
+use tempfile::TempDir;
 use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
 
@@ -55,6 +57,7 @@ const VERSION_TABLE: TableDefinition<NanoId, PackageVersionModel> =
 #[derive(Clone)]
 struct OnyxState {
     pub db: Arc<Database>,
+    pub storage_path: PathBuf,
 }
 
 #[tokio::main]
@@ -62,7 +65,10 @@ async fn main() -> Result<()> {
     let db = Arc::new(Database::create("./db.redb")?);
     create_tables(db.clone())?;
 
-    let app = build_server(db);
+    let app = build_server(OnyxState {
+        db,
+        storage_path: PathBuf::from(STORAGE_PATH),
+    });
     let port = std::env::var("PORT").unwrap_or("3000".to_string());
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
     println!("Listening on port {port}");
@@ -86,7 +92,7 @@ fn create_tables(db: Arc<redb::Database>) -> Result<()> {
     Ok(())
 }
 
-fn build_server(db: Arc<redb::Database>) -> axum::Router {
+fn build_server(state: OnyxState) -> axum::Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
@@ -100,7 +106,7 @@ fn build_server(db: Arc<redb::Database>) -> axum::Router {
         )
         .route("/signup", post(auth::signup))
         .route("/login", post(auth::login))
-        .with_state(OnyxState { db })
+        .with_state(state)
         .layer(cors)
 }
 
