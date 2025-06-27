@@ -19,6 +19,8 @@ mod auth;
 mod error;
 mod list_packages;
 mod publish;
+#[cfg(test)]
+mod tests;
 
 pub use error::OnyxError;
 
@@ -58,12 +60,38 @@ struct OnyxState {
 #[tokio::main]
 async fn main() -> Result<()> {
     let db = Arc::new(Database::create("./db.redb")?);
+    create_tables(db.clone())?;
 
+    let app = build_server(db);
+    let port = std::env::var("PORT").unwrap_or("3000".to_string());
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
+    println!("Listening on port {port}");
+    axum::serve(listener, app).await?;
+    Ok(())
+}
+
+fn create_tables(db: Arc<redb::Database>) -> Result<()> {
+    let write = db.begin_write()?;
+
+    write.open_table(AUTH_TOKEN_TABLE)?;
+    write.open_table(USER_TABLE)?;
+    write.open_table(USERNAME_USER_ID_TABLE)?;
+    write.open_table(PACKAGE_TABLE)?;
+    write.open_table(PACKAGE_NAME_TABLE)?;
+    write.open_table(PACKAGE_VERSION_NAME_TABLE)?;
+    write.open_multimap_table(PACKAGE_VERSION_TABLE)?;
+    write.open_table(VERSION_TABLE)?;
+
+    write.commit()?;
+    Ok(())
+}
+
+fn build_server(db: Arc<redb::Database>) -> axum::Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any);
-    let app = Router::new()
+    Router::new()
         .route("/", get(root))
         .route("/packages", get(list_packages::list_packages))
         .route(
@@ -73,12 +101,7 @@ async fn main() -> Result<()> {
         .route("/signup", post(auth::signup))
         .route("/login", post(auth::login))
         .with_state(OnyxState { db })
-        .layer(cors);
-    let port = std::env::var("PORT").unwrap_or("3000".to_string());
-    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
-    println!("Listening on port {port}");
-    axum::serve(listener, app).await?;
-    Ok(())
+        .layer(cors)
 }
 
 async fn root() -> String {

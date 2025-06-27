@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use super::UserModel;
+use crate::user::UserModelSafe;
 
 #[derive(Serialize, Deserialize)]
 pub struct LoginRequest {
@@ -9,9 +9,9 @@ pub struct LoginRequest {
     pub password: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq)]
 pub struct LoginResponse {
-    pub user: UserModel,
+    pub user: UserModelSafe,
     pub token: String,
     pub expires_at: u64,
 }

@@ -19,5 +19,4 @@ reqwest = { workspace = true }
 
 common = { path = "../common" }
 
-ignore = "0.4.23"
 clap = "4.5.40"

@@ -25,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
                 }
             })
             .unwrap_or(cwd);
-        let tarball = publish::create_tarball(path)?;
+        let tarball = common::create_tarball(path)?;
         if let Some(archive_path) = matches.get_one::<String>("archive") {
             let mut tarball = tarball;
             io::copy(&mut tarball, &mut File::create(archive_path)?)?;

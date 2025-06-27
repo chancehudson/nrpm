@@ -26,7 +26,7 @@ use super::PACKAGE_VERSION_TABLE;
 use super::STORAGE_PATH;
 use super::timestamp;
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct PublishData {
     pub hash: String,
     pub token: String,
@@ -82,7 +82,7 @@ pub async fn publish(
         user_id.to_string()
     } else {
         return Err(OnyxError::bad_request(
-            "Publish request contained invalid token!",
+            "Publish request contains invalid token!",
         ));
     };
     if let Some(package_id) = &publish_data.package_id {
@@ -101,15 +101,17 @@ pub async fn publish(
         };
     }
 
+    println!("sajkhfjakfhka {}", tarball_data.len());
     // now we're authed, and confirmed to be the author of the package
     // let's examine the provided tarball
     let mut tarball = tempfile()?;
     tarball.write_all(&tarball_data)?;
+    tarball.sync_all()?;
     tarball.seek(SeekFrom::Start(0))?;
     let actual_hash = common::hash_tarball(&tarball)?;
 
     if blake3::Hash::from_hex(publish_data.hash)? != actual_hash {
-        println!("WARNING: hash mismatch for uploaded package");
+        println!("WARNING: hash mismatch for uploaded package, computed: {actual_hash}");
         return Err(OnyxError::bad_request(
             "Hash mismatch for uploaded tarball!",
         ));
@@ -143,7 +145,7 @@ pub async fn publish(
         if publish_data.package_id.is_none() {
             // creating a new package, verify that name is available
             if let Some(_) = package_name_table.get(publish_data.package_name.as_str())? {
-                return Err(OnyxError::bad_request("Package name is in use!"));
+                return Err(OnyxError::bad_request("Package name is already in use!"));
             }
         }
         package_name_table.insert(publish_data.package_name.as_str(), ())?;
@@ -198,4 +200,169 @@ pub async fn publish(
     write.commit()?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::tests::*;
+
+    use super::*;
+    use anyhow::Result;
+    use reqwest::multipart;
+
+    #[tokio::test]
+    async fn test_connection() -> Result<()> {
+        let test = OnyxTestState::new().await?;
+        reqwest::Client::new().get(&test.url).send().await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn fail_publish_without_token() -> Result<()> {
+        let test = OnyxTestState::new().await?;
+        let tarball = OnyxTestState::create_test_tarball()?;
+
+        let mut publish_data = PublishData::default();
+        publish_data.hash = tarball.1.to_string();
+        if let Err(e) = test.publish(Some(publish_data), tarball).await {
+            assert_eq!(e.to_string(), "Publish request contains invalid token!");
+            Ok(())
+        } else {
+            panic!();
+        }
+    }
+
+    #[tokio::test]
+    async fn fail_publish_expired_token() -> Result<()> {
+        let test = OnyxTestState::new().await?;
+        let (login, _password) = test.signup(None).await?;
+        let user_id = login.user.id;
+
+        // write an expired token to the db
+        let expired_token = {
+            let token = nanoid!();
+            let expires_at = timestamp() - 1;
+
+            let write = test.state.db.begin_write().unwrap();
+            let mut auth_table = write.open_table(AUTH_TOKEN_TABLE).unwrap();
+            auth_table
+                .insert(token.as_str(), (user_id.as_str(), expires_at))
+                .unwrap();
+            drop(auth_table);
+            write.commit()?;
+
+            token
+        };
+
+        let (tarball_bytes, hash) = OnyxTestState::create_test_tarball()?;
+        let mut publish_data = PublishData::default();
+        publish_data.hash = hash.to_string();
+        publish_data.token = expired_token;
+        if let Err(e) = test
+            .publish(Some(publish_data), (tarball_bytes, hash))
+            .await
+        {
+            assert_eq!(e.to_string(), "Publish request contains invalid token!");
+            Ok(())
+        } else {
+            panic!();
+        }
+    }
+
+    #[tokio::test]
+    async fn fail_publish_without_fields() -> Result<()> {
+        let test = OnyxTestState::new().await?;
+        let (tarball_bytes, hash) = OnyxTestState::create_test_tarball()?;
+        let client = reqwest::Client::new();
+
+        let mut publish_data = PublishData::default();
+        publish_data.hash = hash.to_string();
+        let expected_error =
+            "Publish request missing field, expected: \"tarball\", \"publish_data\"";
+        {
+            // without tarball
+            let form = multipart::Form::new().part(
+                "publish_data",
+                multipart::Part::bytes(bincode::serialize(&publish_data)?),
+            );
+            let response = client
+                .post(format!("{}/publish", test.url))
+                .multipart(form)
+                .send()
+                .await?;
+            if response.status().is_success() {
+                assert!(false);
+            }
+            assert_eq!(response.text().await?, expected_error);
+        }
+
+        {
+            // without publish data
+            let form = multipart::Form::new().part(
+                "tarball",
+                multipart::Part::bytes(tarball_bytes.clone())
+                    .file_name("package.tar")
+                    .mime_str("application/tar")?,
+            );
+            let response = client
+                .post(format!("{}/publish", test.url))
+                .multipart(form)
+                .send()
+                .await?;
+            if response.status().is_success() {
+                assert!(false);
+            }
+            assert_eq!(response.text().await?, expected_error);
+        }
+
+        {
+            // with neither
+            let form = multipart::Form::new().part(
+                "nonsense",
+                multipart::Part::bytes(tarball_bytes)
+                    .file_name("package.tar")
+                    .mime_str("application/tar")?,
+            );
+            let response = client
+                .post(format!("{}/publish", test.url))
+                .multipart(form)
+                .send()
+                .await?;
+            if response.status().is_success() {
+                assert!(false);
+            }
+            assert_eq!(response.text().await?, expected_error);
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn fail_publish_duplicate_package_name() -> Result<()> {
+        let test = OnyxTestState::new().await?;
+        let (login1, _password) = test.signup(None).await?;
+        let (login2, _password) = test.signup(None).await?;
+        let tarball = OnyxTestState::create_test_tarball()?;
+
+        let package_name = nanoid!();
+
+        let data = PublishData {
+            hash: tarball.1.to_string(),
+            token: login1.token,
+            package_id: None,
+            package_name,
+            version_name: nanoid!(),
+        };
+
+        test.publish(Some(data.clone()), tarball.clone()).await?;
+
+        let mut data = data;
+        data.token = login2.token;
+
+        if let Err(e) = test.publish(Some(data), tarball).await {
+            assert_eq!(e.to_string(), "Package name is already in use!");
+            Ok(())
+        } else {
+            panic!();
+        }
+    }
 }

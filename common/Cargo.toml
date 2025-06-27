@@ -8,3 +8,6 @@ license = "MIT OR Apache-2.0"
 anyhow = { workspace = true }
 blake3 = { workspace = true }
 tar = { workspace = true }
+tempfile = { workspace = true }
+
+ignore = "0.4.23"

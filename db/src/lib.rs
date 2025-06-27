@@ -8,3 +8,4 @@ pub use auth::LoginResponse;
 pub use package::PackageModel;
 pub use package_version::PackageVersionModel;
 pub use user::UserModel;
+pub use user::UserModelSafe;

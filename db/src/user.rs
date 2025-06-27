@@ -1,11 +1,36 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+pub struct UserModelSafe {
+    pub id: String,
+    pub username: String,
+    pub created_at: u64,
+}
+
+impl From<UserModel> for UserModelSafe {
+    fn from(
+        UserModel {
+            id,
+            username,
+            created_at,
+            password_hash: _,
+        }: UserModel,
+    ) -> Self {
+        UserModelSafe {
+            id,
+            username,
+            created_at,
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct UserModel {
     pub id: String,
     pub username: String,
     pub created_at: u64,
+
     pub password_hash: String,
 }
 

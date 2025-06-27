@@ -8,6 +8,7 @@ use common::timestamp;
 use db::LoginRequest;
 use db::LoginResponse;
 use db::UserModel;
+use db::UserModelSafe;
 use nanoid::nanoid;
 use redb::ReadableTable;
 
@@ -16,6 +17,8 @@ use super::OnyxError;
 use super::OnyxState;
 use super::USER_TABLE;
 use super::USERNAME_USER_ID_TABLE;
+
+const MIN_PASSWORD_LEN: usize = 10;
 
 pub async fn login(
     State(state): State<OnyxState>,
@@ -41,8 +44,16 @@ pub async fn login(
         }
     };
 
-    if !bcrypt::verify(payload.password, &user.password_hash)? {
-        return Err(OnyxError::bad_request("bad password"));
+    match bcrypt::verify(payload.password, &user.password_hash) {
+        Ok(success) => {
+            if !success {
+                return Err(OnyxError::bad_request("bad password"));
+            }
+        }
+        Err(e) => {
+            println!("bcrypt error: {}", e);
+            return Err(OnyxError::bad_request("bad password"));
+        }
     }
 
     let token = nanoid!();
@@ -56,7 +67,7 @@ pub async fn login(
     write.commit()?;
 
     Ok(ResponseJson(LoginResponse {
-        user,
+        user: UserModelSafe::from(user),
         token,
         expires_at,
     }))
@@ -66,6 +77,11 @@ pub async fn signup(
     State(state): State<OnyxState>,
     Json(payload): Json<LoginRequest>,
 ) -> Result<ResponseJson<LoginResponse>, OnyxError> {
+    if payload.password.len() < MIN_PASSWORD_LEN {
+        return Err(OnyxError::bad_request(&format!(
+            "password must be more than {MIN_PASSWORD_LEN} characters"
+        )));
+    }
     let password_hash = hash(payload.password, DEFAULT_COST)?;
     let write = state.db.begin_write()?;
     let mut username_table = write.open_table(USERNAME_USER_ID_TABLE)?;
@@ -94,8 +110,120 @@ pub async fn signup(
     write.commit()?;
 
     Ok(ResponseJson(LoginResponse {
-        user,
+        user: UserModelSafe::from(user),
         token,
         expires_at,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::tests::OnyxTestState;
+    use anyhow::Result;
+
+    #[tokio::test]
+    async fn should_signup_login() -> Result<()> {
+        let test = OnyxTestState::new().await?;
+
+        let (login, password) = test.signup(None).await?;
+
+        println!(
+            "Created user \"{}\" with password: \"{}\"",
+            login.user.username, password
+        );
+
+        let login2 = test
+            .login(Some(LoginRequest {
+                username: login.user.username.clone(),
+                password,
+            }))
+            .await?;
+
+        // user should match
+        assert!(login2.user == login.user);
+        // tokens should mismatch
+        assert!(login != login2);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn fail_signup_short_password() -> Result<()> {
+        let test = OnyxTestState::new().await?;
+        const TEST_PASSWORD_LEN: usize = MIN_PASSWORD_LEN - 1;
+        if let Err(e) = test
+            .signup(Some(LoginRequest {
+                username: nanoid!(),
+                password: nanoid!(TEST_PASSWORD_LEN),
+            }))
+            .await
+        {
+            assert_eq!(e.to_string(), "password must be more than 10 characters");
+            Ok(())
+        } else {
+            panic!();
+        }
+    }
+
+    #[tokio::test]
+    async fn fail_login_bad_username() -> Result<()> {
+        let test = OnyxTestState::new().await?;
+
+        // test.login(Some(LoginRequest { username: "not_a_user", password: "not_a_password" }))
+        if let Err(e) = test.login(None).await {
+            assert_eq!(e.to_string(), "username not registered");
+            Ok(())
+        } else {
+            panic!();
+        }
+    }
+
+    #[tokio::test]
+    async fn fail_login_bad_password() -> Result<()> {
+        let test = OnyxTestState::new().await?;
+        let (login, _password) = test.signup(None).await?;
+
+        if let Err(e) = test
+            .login(Some(LoginRequest {
+                username: login.user.username,
+                password: nanoid!(),
+            }))
+            .await
+        {
+            assert_eq!(e.to_string(), "bad password");
+            Ok(())
+        } else {
+            panic!();
+        }
+    }
+
+    #[tokio::test]
+    async fn should_double_register_username() -> Result<()> {
+        let test = OnyxTestState::new().await?;
+
+        let username = nanoid!();
+        let (login, password) = test
+            .signup(Some(LoginRequest {
+                username: username.clone(),
+                password: nanoid!(),
+            }))
+            .await?;
+
+        assert_eq!(login.user.username, username);
+
+        if let Err(e) = test
+            .signup(Some(LoginRequest {
+                username: login.user.username,
+                password,
+            }))
+            .await
+        {
+            assert_eq!(e.to_string(), "username is already in use");
+            Ok(())
+        } else {
+            panic!();
+        }
+    }
 }
