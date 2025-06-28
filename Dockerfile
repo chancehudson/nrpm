@@ -25,6 +25,7 @@ RUN apt-get update && apt-get install -y \
 
 # Set working directory
 WORKDIR /app
+RUN mkdir package_data
 
 # Copy binary from builder stage
 COPY --from=builder /app/target/release/onyx ./onyx
