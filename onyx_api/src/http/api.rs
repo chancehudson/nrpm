@@ -23,6 +23,10 @@ impl OnyxApi {
         Ok(Self { url })
     }
 
+    pub fn version_download_url(&self, id: HashId) -> String {
+        format!("{}/version/{}", self.url, id.to_string())
+    }
+
     pub async fn load_packages(&self) -> Result<Vec<(PackageModel, PackageVersionModel)>> {
         let response = reqwest::Client::new()
             .get(format!("{}/packages", self.url))

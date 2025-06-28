@@ -32,9 +32,10 @@ impl OnyxTest {
 
         create_tables(db.clone())?;
 
-        let storage_dir = TempDir::new()?;
-        let storage_path = storage_dir.path().to_path_buf();
-        let state = OnyxState { db, storage_path };
+        let state = OnyxState {
+            db,
+            storage: OnyxStorage::default(),
+        };
         let app = build_server(state.clone());
 
         let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:0")).await?;
@@ -51,7 +52,7 @@ impl OnyxTest {
             state,
 
             // used to keep handles in memory to prevent directory removal until end of program
-            tmp_handles: vec![temp_dir, storage_dir],
+            tmp_handles: vec![temp_dir],
         })
     }
 
@@ -61,13 +62,14 @@ impl OnyxTest {
         let workdir = tempfile::TempDir::new()?;
         std::fs::write(workdir.path().join("aaaaa"), content)?;
         let tar_file = tempfile()?;
-        let tarball = tarball::create(workdir.path().to_path_buf(), tar_file)?;
+        let mut tarball = tarball::create(workdir.path().to_path_buf(), tar_file)?;
         let mut tarball_clone = tarball.try_clone()?;
-        let hash = tarball::hash(&tarball)?;
-        // Explicitly seek the clone to the beginning
+        let hash = tarball::hash(&mut tarball)?;
+
         tarball_clone.seek(std::io::SeekFrom::Start(0))?;
         let mut tarball_bytes = vec![];
         tarball_clone.read_to_end(&mut tarball_bytes)?;
+
         Ok((tarball_bytes, hash))
     }
 

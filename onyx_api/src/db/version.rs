@@ -1,25 +1,24 @@
+use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
+#[cfg(feature = "server")]
+use tokio::io::AsyncRead;
+
+use super::*;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PackageVersionModel {
-    pub id: String,
+    pub id: HashId,
     pub name: String,
     pub author_id: String,
     pub package_id: String,
-    pub hash: [u8; 32],
     pub created_at: u64,
 }
 
+#[cfg(feature = "server")]
 impl PackageVersionModel {
-    pub fn hash_hex(&self) -> String {
-        format!(
-            "0x{}",
-            self.hash
-                .iter()
-                .map(|b| format!("{:02x}", b))
-                .collect::<String>()
-        )
+    pub async fn reader_by_id(storage: OnyxStorage, version_id: HashId) -> Result<impl AsyncRead> {
+        storage.reader_async(&version_id.to_string()).await
     }
 }
 

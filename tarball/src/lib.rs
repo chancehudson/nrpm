@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Read;
 use std::io::Seek;
+use std::io::SeekFrom;
 use std::path::Component;
 use std::path::PathBuf;
 
@@ -13,10 +14,8 @@ use tar::EntryType;
 /// Take a tar archive and calculate a content based hash. Each file is separately hashed
 /// by hashing each path component followed by contents. A final hash is created by combining
 /// all file hashes in lexicographic order of file paths.
-pub fn hash<R>(tarball: R) -> Result<blake3::Hash>
-where
-    R: Read,
-{
+pub fn hash(tarball: &mut File) -> Result<blake3::Hash> {
+    tarball.seek(SeekFrom::Start(0))?;
     let mut archive = Archive::new(tarball);
 
     // println!("Hashing files...");

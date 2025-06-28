@@ -1,36 +1,59 @@
-use anyhow::Result;
-use axum::extract::State;
-use axum::response::Json as ResponseJson;
-use onyx_api::prelude::*;
-use redb::ReadableTable;
+use std::str::FromStr;
 
-use crate::VERSION_TABLE;
+use anyhow::Result;
+use axum::body::Body;
+use axum::extract::Path;
+use axum::extract::State;
+use axum::http::HeaderMap;
+use axum::http::header;
+use axum::response::IntoResponse;
+use axum::response::Response;
+use onyx_api::db::HashId;
+use onyx_api::db::PACKAGE_TABLE;
+use onyx_api::db::VERSION_TABLE;
+use tokio_util::io::ReaderStream;
 
 use super::OnyxError;
 use super::OnyxState;
-use super::PACKAGE_TABLE;
 
-/// TODO
 pub async fn download_package(
     State(state): State<OnyxState>,
-) -> Result<ResponseJson<Vec<(PackageModel, PackageVersionModel)>>, OnyxError> {
-    let read = state.db.begin_read()?;
-    let package_table = read.open_table(PACKAGE_TABLE)?;
-    let version_table = read.open_table(VERSION_TABLE)?;
+    Path(id): Path<String>,
+) -> Result<Response, OnyxError> {
+    let reader = state.storage.reader_async(&id).await?;
 
-    let mut out = vec![];
-    for result in package_table.iter()? {
-        let (_id, package) = result?;
-        if let Some(latest_version) =
-            version_table.get(package.value().latest_version_id.as_str())?
-        {
-            out.push((package.value(), latest_version.value()));
-        } else {
-            println!(
-                "WARNING: failed to load latest version for package: {}",
-                package.value().name
+    let stream = ReaderStream::new(reader);
+    let body = Body::from_stream(stream);
+
+    let read = state.db.begin_read()?;
+    let package_tree = read.open_table(PACKAGE_TABLE)?;
+    let version_tree = read.open_table(VERSION_TABLE)?;
+    if let Some(version) = version_tree.get(HashId::from_str(&id)?)? {
+        let version = version.value();
+        if let Some(package) = package_tree.get(version.package_id.as_str())? {
+            let package = package.value();
+            let mut headers = HeaderMap::new();
+            headers.insert(
+                header::CONTENT_TYPE,
+                "application/octet-stream"
+                    .parse()
+                    .map_err(|_| OnyxError::default())?,
             );
+            headers.insert(
+                header::CONTENT_DISPOSITION,
+                format!(
+                    "attachment; filename=\"{}_{}.tar\"",
+                    package.name, version.name
+                )
+                .parse()
+                .map_err(|_| OnyxError::default())?,
+            );
+
+            Ok((headers, body).into_response())
+        } else {
+            Err(OnyxError::bad_request("Unable to find package"))
         }
+    } else {
+        Err(OnyxError::bad_request("Unable to find version"))
     }
-    Ok(ResponseJson(out))
 }

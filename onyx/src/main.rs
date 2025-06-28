@@ -7,8 +7,6 @@ use axum::extract::DefaultBodyLimit;
 use axum::routing::get;
 use axum::routing::post;
 use redb::Database;
-use redb::MultimapTableDefinition;
-use redb::TableDefinition;
 use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
 
@@ -29,34 +27,10 @@ pub use error::OnyxError;
 const MAX_UPLOAD_SIZE: usize = 20 * 1024 * 1024;
 const STORAGE_PATH: &'static str = "./package_data";
 
-type NanoId<'a> = &'a str;
-// auth token keyed to expiration timestamp
-const AUTH_TOKEN_TABLE: TableDefinition<NanoId, (NanoId, u64)> =
-    TableDefinition::new("auth_tokens");
-// user_id keyed to user document
-const USER_TABLE: TableDefinition<NanoId, UserModel> = TableDefinition::new("users");
-// username keyed to user_id
-const USERNAME_USER_ID_TABLE: TableDefinition<&str, NanoId> =
-    TableDefinition::new("username_user_id");
-
-const PACKAGE_TABLE: TableDefinition<NanoId, PackageModel> = TableDefinition::new("packages");
-// used to ensure package names are unique
-// TODO: sort by semver ordering for efficient latest version lookups
-const PACKAGE_NAME_TABLE: TableDefinition<&str, ()> = TableDefinition::new("package_names");
-// used to prevent multiple versions with the same name for a single package
-// (package_id, version_name) keyed to ()
-const PACKAGE_VERSION_NAME_TABLE: TableDefinition<(NanoId, &str), ()> =
-    TableDefinition::new("package_version_name");
-// package_id keyed to many versions
-const PACKAGE_VERSION_TABLE: MultimapTableDefinition<NanoId, NanoId> =
-    MultimapTableDefinition::new("package_versions");
-const VERSION_TABLE: TableDefinition<NanoId, PackageVersionModel> =
-    TableDefinition::new("versions");
-
 #[derive(Clone)]
 struct OnyxState {
     pub db: Arc<Database>,
-    pub storage_path: PathBuf,
+    pub storage: OnyxStorage,
 }
 
 #[tokio::main]
@@ -66,7 +40,7 @@ async fn main() -> Result<()> {
 
     let app = build_server(OnyxState {
         db,
-        storage_path: PathBuf::from(STORAGE_PATH),
+        storage: OnyxStorage::new(PathBuf::from(STORAGE_PATH))?,
     });
     let port = std::env::var("PORT").unwrap_or("3000".to_string());
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
@@ -107,6 +81,7 @@ fn build_server(state: OnyxState) -> axum::Router {
         .route("/login", post(auth::login))
         .route("/auth", post(user::current_auth))
         .route("/propose_token", post(user::propose_token))
+        .route("/version/{id}", get(download::download_package))
         .with_state(state)
         .layer(cors)
 }

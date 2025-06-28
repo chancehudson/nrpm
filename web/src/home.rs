@@ -7,7 +7,7 @@ use super::components::Header;
 pub fn HomeView() -> Element {
     let mut is_loading = use_signal(|| false);
     let mut status = use_signal(|| String::new());
-    let mut packages = use_signal(|| Vec::<(PackageModel, PackageVersionModel)>::new());
+    let mut packages = use_signal(|| Vec::<(PackageModel, PackageVersionModel, String)>::new());
 
     let load_packages = move || {
         spawn(async move {
@@ -15,7 +15,11 @@ pub fn HomeView() -> Element {
 
             let api = OnyxApi::default();
             match api.load_packages().await {
-                Ok(p) => packages.set(p),
+                Ok(p) => packages.set(
+                    p.into_iter()
+                        .map(|(p, v)| (p, v.clone(), api.version_download_url(v.id)))
+                        .collect::<Vec<_>>(),
+                ),
                 Err(e) => status.set(format!("Error: {}", e)),
             };
 
@@ -49,26 +53,23 @@ pub fn HomeView() -> Element {
                 }
             }
 
-            for (package, latest_version) in packages.read().iter() {
+            for (package, latest_version, download_url) in packages.read().iter() {
                 div {
                     key: "{package.id}",
-                    style: "display: flex; flex-direction: column; border-left: 1px solid black; padding: 4px;",
+                    style: "display: flex; flex-direction: column; border-left: 1px solid black; border-bottom: 1px solid black; padding: 4px; margin-top: 4px;",
                     div {
-                        "name: {package.name}"
-                    },
-                    div {
-                        "latest version: {latest_version.name}"
+                        "{package.name}@{latest_version.name}"
                     },
                     div {
                         "published {time_ago(latest_version.created_at)}"
                     },
                     div {
-                        "hash: {latest_version.hash_hex()}"
-                    }
+                        "blake3: {latest_version.id.to_string()}"
+                    },
                     a {
-                        href: "https://afaf.com",
+                        href: "{download_url}",
                         "Download"
-                    }
+                    },
                 }
             }
         }

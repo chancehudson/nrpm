@@ -1,6 +1,3 @@
-use std::fs;
-use std::io::Seek;
-use std::io::SeekFrom;
 use std::io::Write;
 
 use anyhow::Result;
@@ -94,10 +91,8 @@ pub async fn publish(
     // let's examine the provided tarball
     let mut tarball = tempfile()?;
     tarball.write_all(&tarball_data)?;
-    tarball.flush()?;
-    tarball.sync_all()?;
-    tarball.seek(SeekFrom::Start(0))?;
-    let actual_hash = tarball::hash(&tarball)?;
+
+    let actual_hash = tarball::hash(&mut tarball)?;
 
     if blake3::Hash::from_hex(publish_data.hash)? != actual_hash {
         println!("WARNING: hash mismatch for uploaded package, computed: {actual_hash}");
@@ -105,21 +100,6 @@ pub async fn publish(
             "Hash mismatch for uploaded tarball!",
         ));
     }
-
-    let target_path = state
-        .storage_path
-        .join(format!("{}.tar", actual_hash.to_string()));
-    if target_path.exists() {
-        println!(
-            "WARNING: package already exists with hash: {}",
-            actual_hash.to_string()
-        );
-        return Err(OnyxError::bad_request(&format!(
-            "Package with hash already exists: {}",
-            actual_hash.to_string()
-        )));
-    }
-    fs::write(target_path, tarball_data)?;
 
     // now write our package to the db
     let write = state.db.begin_write()?;
@@ -141,7 +121,25 @@ pub async fn publish(
         package_name_table.insert(publish_data.package_name.as_str(), ())?;
 
         // generate a new version id for what is being published
-        let version_id = nanoid!();
+        let version_id = HashId::from(actual_hash);
+        if let Some(_) = version_table.get(&version_id)? {
+            return Err(OnyxError::bad_request("Package with hash already exists"));
+        } else {
+            if let Err(e) = state
+                .storage
+                .ingest_file(&mut tarball, HashId::from(actual_hash).to_string())
+            {
+                println!(
+                    "WARNING: package already exists with hash: {} {}",
+                    actual_hash.to_string(),
+                    e
+                );
+                return Err(OnyxError::bad_request(&format!(
+                    "File with hash already exists: {}",
+                    actual_hash.to_string()
+                )));
+            }
+        }
 
         let package = if let Some(package_id) = publish_data.package_id {
             // we confimed the package exists above so unwrap is safe here
@@ -174,15 +172,14 @@ pub async fn publish(
             (package.id.as_str(), publish_data.version_name.as_str()),
             (),
         )?;
-        package_version_table.insert(package.id.as_str(), version_id.as_str())?;
+        package_version_table.insert(package.id.as_str(), version_id.clone())?;
         version_table.insert(
-            version_id.as_str(),
+            version_id.clone(),
             PackageVersionModel {
-                id: version_id.clone(),
+                id: version_id,
                 name: publish_data.version_name,
                 author_id: user_id,
                 package_id: package.id.clone(),
-                hash: *actual_hash.as_bytes(),
                 created_at: timestamp(),
             },
         )?;
@@ -357,26 +354,28 @@ mod tests {
     #[tokio::test]
     async fn fail_publish_duplicate_package_hash() -> Result<()> {
         let test = OnyxTest::new().await?;
-        let (login1, _password) = test.signup(None).await?;
-        let (login2, _password) = test.signup(None).await?;
+        let (login, _password) = test.signup(None).await?;
         let tarball = OnyxTest::create_test_tarball(None)?;
 
         let package_name = nanoid!();
 
         let data = PublishData {
             hash: tarball.1.to_string(),
-            token: login1.token,
+            token: login.token,
             package_id: None,
             package_name,
             version_name: nanoid!(),
         };
 
-        test.publish(Some(data.clone()), tarball.clone()).await?;
+        let PublishResponse { package_id } =
+            test.publish(Some(data.clone()), tarball.clone()).await?;
 
         let mut data = data;
-        data.token = login2.token;
+        data.package_id = Some(package_id);
+        data.version_name = nanoid!();
 
         let e = test.publish(Some(data), tarball).await.unwrap_err();
+        println!("{e}");
         assert!(
             e.to_string()
                 .starts_with("Package with hash already exists")

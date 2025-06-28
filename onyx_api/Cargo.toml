@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-server = ["redb", "bincode", "publish"]
+server = ["redb", "bincode", "publish", "tokio"]
 publish = ["bincode"]
 
 [dependencies]
@@ -14,3 +14,7 @@ serde_json = { workspace = true }
 anyhow = { workspace = true }
 reqwest = { workspace = true }
 bincode = { workspace = true, optional = true }
+blake3 = { workspace = true }
+nanoid = { workspace = true }
+tokio = { workspace = true, optional = true }
+hex = "0.4.3"

@@ -10,6 +10,8 @@ pub struct UserModel {
     pub password_hash: String,
 }
 
+impl UserModel {}
+
 #[cfg(feature = "server")]
 impl redb::Value for UserModel {
     type SelfType<'a> = UserModel;

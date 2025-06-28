@@ -33,12 +33,11 @@ async fn main() -> Result<()> {
                 }
             })
             .unwrap_or(cwd);
-        let tarball = tarball::create(path, tempfile()?)?;
+        let mut tarball = tarball::create(path, tempfile()?)?;
         if let Some(archive_path) = matches.get_one::<String>("archive") {
-            let mut tarball = tarball;
             io::copy(&mut tarball, &mut File::create(archive_path)?)?;
         } else {
-            publish::upload_tarball(login, &api, tarball).await?;
+            publish::upload_tarball(login, &api, &mut tarball).await?;
         }
     }
     Ok(())

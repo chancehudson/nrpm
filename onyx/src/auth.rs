@@ -9,11 +9,8 @@ use redb::ReadableTable;
 
 use onyx_api::prelude::*;
 
-use super::AUTH_TOKEN_TABLE;
 use super::OnyxError;
 use super::OnyxState;
-use super::USER_TABLE;
-use super::USERNAME_USER_ID_TABLE;
 
 const MIN_PASSWORD_LEN: usize = 10;
 

@@ -1,6 +1,11 @@
 pub mod db;
 pub mod http;
 pub mod prelude;
+#[cfg(feature = "server")]
+mod storage;
+
+#[cfg(feature = "server")]
+use storage::*;
 
 pub use http::OnyxApi;
 
