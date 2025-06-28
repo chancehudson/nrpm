@@ -3,15 +3,12 @@ use std::io::Read;
 use std::io::Seek;
 
 use anyhow::Result;
-use common::OnyxApi;
-use common::api_types::LoginResponse;
-use common::api_types::PublishData;
-use common::api_types::PublishResponse;
 use dialoguer::Input;
+use onyx_api::prelude::*;
 
 pub async fn upload_tarball(login: LoginResponse, api: &OnyxApi, tarball: File) -> Result<()> {
     let mut tarball = tarball;
-    let hash = common::hash_tarball(&tarball)?;
+    let hash = tarball::hash(&tarball)?;
     // reset the file handle for copying to final destination
     tarball.seek(std::io::SeekFrom::Start(0))?;
     let mut tarball_bytes = vec![];

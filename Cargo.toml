@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 
-members = ["cli", "onyx", "common", "web", "db"]
+members = ["onyx", "onyx_api", "web", "cli", "tarball"]
 
 [workspace.dependencies]
 anyhow = "1.0.98"
@@ -14,6 +14,7 @@ reqwest = { version = "0.12.20", features = ["multipart", "json"] }
 redb = "2.6.0"
 serde_json = "1.0.140"
 nanoid = "0.4.0"
+bincode = { version = "1.0.0" }
 
 [profile]
 

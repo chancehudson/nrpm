@@ -456,13 +456,14 @@ dependencies = [
  "anyhow",
  "blake3",
  "clap",
- "common",
  "dialoguer",
  "nanoid",
+ "onyx_api",
  "open",
  "reqwest",
  "serde",
  "tar",
+ "tarball",
  "tempfile",
  "tokio",
 ]
@@ -472,23 +473,6 @@ name = "colorchoice"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b05b61dc5112cbb17e4b6cd61790d9845d13888356391624cbe7e41efeac1e75"
-
-[[package]]
-name = "common"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bincode",
- "blake3",
- "db",
- "ignore",
- "nanoid",
- "reqwest",
- "serde",
- "serde_json",
- "tar",
- "tempfile",
-]
 
 [[package]]
 name = "console"
@@ -697,16 +681,6 @@ name = "data-encoding"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a2330da5de22e8a3cb63252ce2abb30116bf5265e89c0e01bc17015ce30a476"
-
-[[package]]
-name = "db"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "redb",
- "serde",
- "serde_json",
-]
 
 [[package]]
 name = "deranged"
@@ -2070,17 +2044,29 @@ dependencies = [
  "bcrypt",
  "bincode",
  "blake3",
- "common",
- "db",
  "nanoid",
+ "onyx_api",
  "rand 0.9.1",
  "redb",
  "reqwest",
  "serde",
  "serde_json",
+ "tarball",
  "tempfile",
  "tokio",
  "tower-http",
+]
+
+[[package]]
+name = "onyx_api"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "redb",
+ "reqwest",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -2900,6 +2886,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "tarball"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "blake3",
+ "ignore",
+ "nanoid",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tar",
+ "tempfile",
+]
+
+[[package]]
 name = "tempfile"
 version = "3.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3422,13 +3424,12 @@ name = "web"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "common",
- "db",
  "dioxus",
  "dioxus-web",
  "getrandom 0.2.16",
  "gloo-storage",
  "js-sys",
+ "onyx_api",
  "reqwest",
  "serde",
  "serde_json",

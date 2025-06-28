@@ -13,7 +13,7 @@ use tar::EntryType;
 /// Take a tar archive and calculate a content based hash. Each file is separately hashed
 /// by hashing each path component followed by contents. A final hash is created by combining
 /// all file hashes in lexicographic order of file paths.
-pub fn hash_tarball<R>(tarball: R) -> Result<blake3::Hash>
+pub fn hash<R>(tarball: R) -> Result<blake3::Hash>
 where
     R: Read,
 {
@@ -68,7 +68,7 @@ where
 /// This function will look for a .gitignore in all directories and follow it.
 /// Empty directories are not included. Irregular files (symlinks, block devices, etc) are not included.
 /// File permission errors will cause a failure. File paths are stored relative to `path`.
-pub fn create_tarball(path: PathBuf, tar_file: File) -> Result<File> {
+pub fn create(path: PathBuf, tar_file: File) -> Result<File> {
     let path = match path.canonicalize() {
         Ok(p) => p,
         Err(e) => anyhow::bail!("Failed to canonicalize path: {:?} error: {:?}", path, e),

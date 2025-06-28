@@ -4,17 +4,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
-use common::OnyxApi;
-use common::api_types::LoginRequest;
-use common::api_types::LoginResponse;
-use common::create_tarball;
-use common::hash_tarball;
 use nanoid::nanoid;
 use tempfile::TempDir;
 use tempfile::tempfile;
 
-use common::api_types::PublishData;
-use common::api_types::PublishResponse;
+use onyx_api::prelude::*;
 
 use super::OnyxState;
 use super::build_server;
@@ -67,9 +61,9 @@ impl OnyxTestState {
         let workdir = tempfile::TempDir::new()?;
         std::fs::write(workdir.path().join("aaaaa"), content)?;
         let tar_file = tempfile()?;
-        let tarball = create_tarball(workdir.path().to_path_buf(), tar_file)?;
+        let tarball = tarball::create(workdir.path().to_path_buf(), tar_file)?;
         let mut tarball_clone = tarball.try_clone()?;
-        let hash = hash_tarball(&tarball)?;
+        let hash = tarball::hash(&tarball)?;
         // Explicitly seek the clone to the beginning
         tarball_clone.seek(std::io::SeekFrom::Start(0))?;
         let mut tarball_bytes = vec![];

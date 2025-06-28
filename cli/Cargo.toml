@@ -18,7 +18,8 @@ tempfile = { workspace = true }
 reqwest = { workspace = true }
 nanoid = { workspace = true }
 
-common = { path = "../common" }
+onyx_api = { path = "../onyx_api", features = ["publish"] }
+tarball = { path = "../tarball" }
 
 clap = "4.5.40"
 dialoguer = "0.11.0"

@@ -1,10 +1,8 @@
-mod api;
-pub mod api_types;
-mod tarball;
+pub mod db;
+pub mod http;
+pub mod prelude;
 
-pub use api::OnyxApi;
-pub use tarball::create_tarball;
-pub use tarball::hash_tarball;
+pub use http::OnyxApi;
 
 #[cfg(debug_assertions)]
 pub const REGISTRY_URL: &'static str = "http://127.0.0.1:3000";

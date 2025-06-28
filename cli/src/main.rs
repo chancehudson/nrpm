@@ -7,9 +7,8 @@ use anyhow::Result;
 use clap::Arg;
 use clap::ArgAction;
 use clap::Command;
-use common::OnyxApi;
-use common::api_types::LoginResponse;
 use nanoid::nanoid;
+use onyx_api::prelude::*;
 use tempfile::tempfile;
 use tokio;
 
@@ -34,7 +33,7 @@ async fn main() -> Result<()> {
                 }
             })
             .unwrap_or(cwd);
-        let tarball = common::create_tarball(path, tempfile()?)?;
+        let tarball = tarball::create(path, tempfile()?)?;
         if let Some(archive_path) = matches.get_one::<String>("archive") {
             let mut tarball = tarball;
             io::copy(&mut tarball, &mut File::create(archive_path)?)?;

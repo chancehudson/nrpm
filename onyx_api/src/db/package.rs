@@ -1,3 +1,5 @@
+use std::io::Read;
+
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -8,6 +10,13 @@ pub struct PackageModel {
     pub author_id: String,
     pub latest_version_id: String,
 }
+
+// impl PackageModel { pub async fn download<T>(&self, package_id: &str, version_id: &str) -> Result<T>
+//     where
+//         T: Read,
+//     {
+//     }
+// }
 
 #[cfg(feature = "server")]
 impl redb::Value for PackageModel {

@@ -1,0 +1,16 @@
+[package]
+name = "onyx_api"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+server = ["redb", "bincode", "publish"]
+publish = ["bincode"]
+
+[dependencies]
+serde = { workspace = true }
+redb = { workspace = true, optional = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+reqwest = { workspace = true }
+bincode = { workspace = true, optional = true }

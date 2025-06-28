@@ -2,11 +2,9 @@ use anyhow::Result;
 use reqwest::multipart;
 use serde_json::json;
 
-use db::PackageModel;
-use db::PackageVersionModel;
-
+use super::types::*;
 use crate::REGISTRY_URL;
-use crate::api_types::*;
+use crate::db::*;
 
 pub struct OnyxApi {
     pub url: String,
@@ -80,7 +78,7 @@ impl OnyxApi {
             let data: LoginResponse = response.json().await?;
 
             #[cfg(test)]
-            assert!(data.user.created_at.abs_diff(super::timestamp()) < 10); // timestamp should be sane
+            assert!(data.user.created_at.abs_diff(crate::timestamp()) < 10); // timestamp should be sane
 
             Ok(data)
         } else {
@@ -102,6 +100,7 @@ impl OnyxApi {
         }
     }
 
+    #[cfg(feature = "publish")]
     pub async fn publish(&self, request: PublishData, tarball: Vec<u8>) -> Result<PublishResponse> {
         let form = multipart::Form::new()
             .part(
@@ -112,6 +111,10 @@ impl OnyxApi {
             )
             .part(
                 "publish_data",
+                // idk about this use of bincode
+                // feels like a serialize to json
+                //
+                // ehhh no publish from web
                 multipart::Part::bytes(bincode::serialize(&request)?),
             );
         let response = reqwest::Client::new()

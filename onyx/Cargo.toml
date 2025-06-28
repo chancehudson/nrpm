@@ -14,8 +14,8 @@ redb = { workspace = true }
 reqwest = { workspace = true }
 nanoid = { workspace = true }
 
-common = { path = "../common" }
-db = { path = "../db", features = ["server"] }
+onyx_api = { path = "../onyx_api", features = ["server"] }
+tarball = { path = "../tarball" }
 
 axum = { version = "0.8.4", features = ["http2", "multipart"] }
 rand = "0.9.1"

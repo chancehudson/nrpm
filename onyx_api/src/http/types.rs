@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use db::UserModelSafe;
+use crate::db::UserModelSafe;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct TokenOnly {

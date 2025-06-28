@@ -1,5 +1,5 @@
-use common::OnyxApi;
 use dioxus::prelude::*;
+use onyx_api::OnyxApi;
 use web_sys::UrlSearchParams;
 
 use super::components::Auth;

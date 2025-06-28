@@ -1,8 +1,7 @@
 use anyhow::Result;
 use axum::extract::State;
 use axum::response::Json as ResponseJson;
-use db::PackageModel;
-use db::PackageVersionModel;
+use onyx_api::prelude::*;
 use redb::ReadableTable;
 
 use crate::VERSION_TABLE;

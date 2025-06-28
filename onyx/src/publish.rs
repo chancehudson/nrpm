@@ -7,13 +7,11 @@ use anyhow::Result;
 use axum::extract::Multipart;
 use axum::extract::State;
 use axum::response::Json as ResponseJson;
-use common::api_types::PublishData;
-use common::api_types::PublishResponse;
-use db::PackageModel;
-use db::PackageVersionModel;
 use nanoid::nanoid;
 use redb::ReadableTable;
 use tempfile::tempfile;
+
+use onyx_api::prelude::*;
 
 use crate::PACKAGE_NAME_TABLE;
 use crate::PACKAGE_VERSION_NAME_TABLE;
@@ -99,7 +97,7 @@ pub async fn publish(
     tarball.flush()?;
     tarball.sync_all()?;
     tarball.seek(SeekFrom::Start(0))?;
-    let actual_hash = common::hash_tarball(&tarball)?;
+    let actual_hash = tarball::hash(&tarball)?;
 
     if blake3::Hash::from_hex(publish_data.hash)? != actual_hash {
         println!("WARNING: hash mismatch for uploaded package, computed: {actual_hash}");

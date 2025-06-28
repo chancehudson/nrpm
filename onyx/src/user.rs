@@ -2,13 +2,10 @@ use anyhow::Result;
 use axum::extract::Json;
 use axum::extract::State;
 use axum::response::Json as ResponseJson;
-use common::api_types::LoginResponse;
-use common::api_types::ProposeToken;
-use common::api_types::TokenOnly;
-use common::timestamp;
-use db::UserModelSafe;
 use nanoid::nanoid;
 use reqwest::StatusCode;
+
+use onyx_api::prelude::*;
 
 use super::AUTH_TOKEN_TABLE;
 use super::OnyxError;
@@ -92,8 +89,8 @@ mod tests {
     use crate::AUTH_TOKEN_TABLE;
     use crate::tests::OnyxTestState;
     use anyhow::Result;
-    use common::timestamp;
     use nanoid::nanoid;
+    use onyx_api::timestamp;
 
     #[tokio::test]
     async fn fail_auth_bad_token() -> Result<()> {

@@ -4,13 +4,10 @@ use axum::extract::State;
 use axum::response::Json as ResponseJson;
 use bcrypt::DEFAULT_COST;
 use bcrypt::hash;
-use common::api_types::LoginRequest;
-use common::api_types::LoginResponse;
-use common::timestamp;
-use db::UserModel;
-use db::UserModelSafe;
 use nanoid::nanoid;
 use redb::ReadableTable;
+
+use onyx_api::prelude::*;
 
 use super::AUTH_TOKEN_TABLE;
 use super::OnyxError;
