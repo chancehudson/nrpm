@@ -117,12 +117,12 @@ pub async fn signup(
 mod tests {
     use super::*;
 
-    use crate::tests::OnyxTestState;
+    use crate::tests::OnyxTest;
     use anyhow::Result;
 
     #[tokio::test]
     async fn should_signup_login() -> Result<()> {
-        let test = OnyxTestState::new().await?;
+        let test = OnyxTest::new().await?;
 
         let (login, password) = test.signup(None).await?;
 
@@ -148,7 +148,7 @@ mod tests {
 
     #[tokio::test]
     async fn fail_signup_short_password() -> Result<()> {
-        let test = OnyxTestState::new().await?;
+        let test = OnyxTest::new().await?;
         const TEST_PASSWORD_LEN: usize = MIN_PASSWORD_LEN - 1;
         let e = test
             .signup(Some(LoginRequest {
@@ -163,7 +163,7 @@ mod tests {
 
     #[tokio::test]
     async fn fail_login_bad_username() -> Result<()> {
-        let test = OnyxTestState::new().await?;
+        let test = OnyxTest::new().await?;
 
         // test.login(Some(LoginRequest { username: "not_a_user", password: "not_a_password" }))
         let e = test.login(None).await.unwrap_err();
@@ -173,7 +173,7 @@ mod tests {
 
     #[tokio::test]
     async fn fail_login_bad_password() -> Result<()> {
-        let test = OnyxTestState::new().await?;
+        let test = OnyxTest::new().await?;
         let (login, _password) = test.signup(None).await?;
 
         let e = test
@@ -189,7 +189,7 @@ mod tests {
 
     #[tokio::test]
     async fn should_double_register_username() -> Result<()> {
-        let test = OnyxTestState::new().await?;
+        let test = OnyxTest::new().await?;
 
         let username = nanoid!();
         let (login, password) = test

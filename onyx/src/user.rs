@@ -87,14 +87,14 @@ pub async fn propose_token(
 #[cfg(test)]
 mod tests {
     use crate::AUTH_TOKEN_TABLE;
-    use crate::tests::OnyxTestState;
+    use crate::tests::OnyxTest;
     use anyhow::Result;
     use nanoid::nanoid;
     use onyx_api::timestamp;
 
     #[tokio::test]
     async fn fail_auth_bad_token() -> Result<()> {
-        let test = OnyxTestState::new().await?;
+        let test = OnyxTest::new().await?;
 
         let e = test
             .api
@@ -107,7 +107,7 @@ mod tests {
 
     #[tokio::test]
     async fn fail_auth_expired_token() -> Result<()> {
-        let test = OnyxTestState::new().await?;
+        let test = OnyxTest::new().await?;
 
         let (login, _password) = test.signup(None).await?;
 

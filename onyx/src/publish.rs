@@ -206,15 +206,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_connection() -> Result<()> {
-        let test = OnyxTestState::new().await?;
+        let test = OnyxTest::new().await?;
         reqwest::Client::new().get(&test.url).send().await?;
         Ok(())
     }
 
     #[tokio::test]
     async fn fail_publish_without_token() -> Result<()> {
-        let test = OnyxTestState::new().await?;
-        let tarball = OnyxTestState::create_test_tarball(None)?;
+        let test = OnyxTest::new().await?;
+        let tarball = OnyxTest::create_test_tarball(None)?;
 
         let mut publish_data = PublishData::default();
         publish_data.hash = tarball.1.to_string();
@@ -225,7 +225,7 @@ mod tests {
 
     #[tokio::test]
     async fn fail_publish_expired_token() -> Result<()> {
-        let test = OnyxTestState::new().await?;
+        let test = OnyxTest::new().await?;
         let (login, _password) = test.signup(None).await?;
         let user_id = login.user.id;
 
@@ -245,7 +245,7 @@ mod tests {
             token
         };
 
-        let (tarball_bytes, hash) = OnyxTestState::create_test_tarball(None)?;
+        let (tarball_bytes, hash) = OnyxTest::create_test_tarball(None)?;
         let mut publish_data = PublishData::default();
         publish_data.hash = hash.to_string();
         publish_data.token = expired_token;
@@ -259,8 +259,8 @@ mod tests {
 
     #[tokio::test]
     async fn fail_publish_deformed_data() -> Result<()> {
-        let test = OnyxTestState::new().await?;
-        let (tarball_bytes, _hash) = OnyxTestState::create_test_tarball(None)?;
+        let test = OnyxTest::new().await?;
+        let (tarball_bytes, _hash) = OnyxTest::create_test_tarball(None)?;
 
         let form = multipart::Form::new()
             .part(
@@ -289,8 +289,8 @@ mod tests {
 
     #[tokio::test]
     async fn fail_publish_without_fields() -> Result<()> {
-        let test = OnyxTestState::new().await?;
-        let (tarball_bytes, hash) = OnyxTestState::create_test_tarball(None)?;
+        let test = OnyxTest::new().await?;
+        let (tarball_bytes, hash) = OnyxTest::create_test_tarball(None)?;
         let client = reqwest::Client::new();
 
         let mut publish_data = PublishData::default();
@@ -356,10 +356,10 @@ mod tests {
 
     #[tokio::test]
     async fn fail_publish_duplicate_package_hash() -> Result<()> {
-        let test = OnyxTestState::new().await?;
+        let test = OnyxTest::new().await?;
         let (login1, _password) = test.signup(None).await?;
         let (login2, _password) = test.signup(None).await?;
-        let tarball = OnyxTestState::create_test_tarball(None)?;
+        let tarball = OnyxTest::create_test_tarball(None)?;
 
         let package_name = nanoid!();
 
@@ -386,10 +386,10 @@ mod tests {
 
     #[tokio::test]
     async fn fail_publish_duplicate_package_name() -> Result<()> {
-        let test = OnyxTestState::new().await?;
+        let test = OnyxTest::new().await?;
         let (login1, _password) = test.signup(None).await?;
         let (login2, _password) = test.signup(None).await?;
-        let tarball = OnyxTestState::create_test_tarball(Some("content1"))?;
+        let tarball = OnyxTest::create_test_tarball(Some("content1"))?;
 
         let data = PublishData {
             hash: tarball.1.to_string(),
@@ -402,7 +402,7 @@ mod tests {
         test.publish(Some(data.clone()), tarball.clone()).await?;
 
         // reuse our data with the same package name but different hash
-        let tarball = OnyxTestState::create_test_tarball(Some("content2"))?;
+        let tarball = OnyxTest::create_test_tarball(Some("content2"))?;
         let mut data = data;
         data.token = login2.token;
         data.hash = tarball.1.to_string();
@@ -414,10 +414,10 @@ mod tests {
 
     #[tokio::test]
     async fn fail_publish_non_author() -> Result<()> {
-        let test = OnyxTestState::new().await?;
+        let test = OnyxTest::new().await?;
         let (login1, _password) = test.signup(None).await?;
         let (login2, _password) = test.signup(None).await?;
-        let tarball = OnyxTestState::create_test_tarball(Some("content1"))?;
+        let tarball = OnyxTest::create_test_tarball(Some("content1"))?;
 
         let data = PublishData {
             hash: tarball.1.to_string(),
@@ -430,7 +430,7 @@ mod tests {
         let PublishResponse { package_id } =
             test.publish(Some(data.clone()), tarball.clone()).await?;
 
-        let tarball = OnyxTestState::create_test_tarball(Some("content2"))?;
+        let tarball = OnyxTest::create_test_tarball(Some("content2"))?;
 
         let mut data = data;
         data.token = login2.token;
@@ -444,9 +444,9 @@ mod tests {
 
     #[tokio::test]
     async fn fail_publish_name_mismatch() -> Result<()> {
-        let test = OnyxTestState::new().await?;
+        let test = OnyxTest::new().await?;
         let (login, _password) = test.signup(None).await?;
-        let tarball = OnyxTestState::create_test_tarball(Some("content1"))?;
+        let tarball = OnyxTest::create_test_tarball(Some("content1"))?;
 
         let data = PublishData {
             hash: tarball.1.to_string(),
@@ -459,7 +459,7 @@ mod tests {
         let PublishResponse { package_id } =
             test.publish(Some(data.clone()), tarball.clone()).await?;
 
-        let tarball = OnyxTestState::create_test_tarball(Some("content2"))?;
+        let tarball = OnyxTest::create_test_tarball(Some("content2"))?;
 
         let mut data = data;
         data.hash = tarball.1.to_string();
@@ -473,9 +473,9 @@ mod tests {
 
     #[tokio::test]
     async fn fail_publish_bad_package_id() -> Result<()> {
-        let test = OnyxTestState::new().await?;
+        let test = OnyxTest::new().await?;
         let (login, _password) = test.signup(None).await?;
-        let tarball = OnyxTestState::create_test_tarball(Some("content1"))?;
+        let tarball = OnyxTest::create_test_tarball(Some("content1"))?;
 
         let data = PublishData {
             hash: tarball.1.to_string(),
@@ -492,10 +492,10 @@ mod tests {
 
     #[tokio::test]
     async fn fail_publish_hash_mismatch() -> Result<()> {
-        let test = OnyxTestState::new().await?;
+        let test = OnyxTest::new().await?;
         let (login, _password) = test.signup(None).await?;
-        let tarball = OnyxTestState::create_test_tarball(Some("content1"))?;
-        let tarball2 = OnyxTestState::create_test_tarball(Some("content2"))?;
+        let tarball = OnyxTest::create_test_tarball(Some("content1"))?;
+        let tarball2 = OnyxTest::create_test_tarball(Some("content2"))?;
 
         let data = PublishData {
             hash: tarball2.1.to_string(),
@@ -512,9 +512,9 @@ mod tests {
 
     #[tokio::test]
     async fn fail_publish_duplicate_version() -> Result<()> {
-        let test = OnyxTestState::new().await?;
+        let test = OnyxTest::new().await?;
         let (login, _password) = test.signup(None).await?;
-        let tarball = OnyxTestState::create_test_tarball(Some("content1"))?;
+        let tarball = OnyxTest::create_test_tarball(Some("content1"))?;
 
         let version_name = nanoid!();
         let package_name = nanoid!();
@@ -527,7 +527,7 @@ mod tests {
         };
         let PublishResponse { package_id } = test.publish(Some(data), tarball).await?;
 
-        let tarball = OnyxTestState::create_test_tarball(Some("content2"))?;
+        let tarball = OnyxTest::create_test_tarball(Some("content2"))?;
         let data = PublishData {
             hash: tarball.1.to_string(),
             token: login.token,
@@ -546,9 +546,9 @@ mod tests {
 
     #[tokio::test]
     async fn publish_package_and_new_version() -> Result<()> {
-        let test = OnyxTestState::new().await?;
+        let test = OnyxTest::new().await?;
         let (login, _password) = test.signup(None).await?;
-        let tarball = OnyxTestState::create_test_tarball(Some("content1"))?;
+        let tarball = OnyxTest::create_test_tarball(Some("content1"))?;
 
         let package_name = nanoid!();
         let data = PublishData {
@@ -560,7 +560,7 @@ mod tests {
         };
         let PublishResponse { package_id } = test.publish(Some(data), tarball).await?;
 
-        let tarball = OnyxTestState::create_test_tarball(Some("content2"))?;
+        let tarball = OnyxTest::create_test_tarball(Some("content2"))?;
         let data = PublishData {
             hash: tarball.1.to_string(),
             token: login.token,

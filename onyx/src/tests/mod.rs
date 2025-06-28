@@ -14,7 +14,7 @@ use super::OnyxState;
 use super::build_server;
 use super::create_tables;
 
-pub struct OnyxTestState {
+pub struct OnyxTest {
     pub url: String,
     pub state: OnyxState,
     pub api: OnyxApi,
@@ -23,7 +23,7 @@ pub struct OnyxTestState {
     tmp_handles: Vec<TempDir>,
 }
 
-impl OnyxTestState {
+impl OnyxTest {
     pub async fn new() -> Result<Self> {
         let temp_dir = TempDir::new()?;
 
