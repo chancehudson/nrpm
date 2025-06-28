@@ -2,14 +2,11 @@ use anyhow::Result;
 use reqwest::multipart;
 use serde_json::json;
 
-use crate::REGISTRY_URL;
-use crate::api_types::ProposeToken;
-use crate::api_types::TokenOnly;
+use db::PackageModel;
+use db::PackageVersionModel;
 
-use super::api_types::LoginRequest;
-use super::api_types::LoginResponse;
-use super::api_types::PublishData;
-use super::api_types::PublishResponse;
+use crate::REGISTRY_URL;
+use crate::api_types::*;
 
 pub struct OnyxApi {
     pub url: String,
@@ -26,6 +23,19 @@ impl Default for OnyxApi {
 impl OnyxApi {
     pub fn new(url: String) -> Result<Self> {
         Ok(Self { url })
+    }
+
+    pub async fn load_packages(&self) -> Result<Vec<(PackageModel, PackageVersionModel)>> {
+        let response = reqwest::Client::new()
+            .get(format!("{}/packages", self.url))
+            .send()
+            .await?;
+        if response.status().is_success() {
+            let data = response.json().await?;
+            Ok(data)
+        } else {
+            anyhow::bail!("{}", response.text().await?);
+        }
     }
 
     pub async fn auth(&self, token: String) -> Result<LoginResponse> {

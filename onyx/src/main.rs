@@ -17,6 +17,7 @@ use tower_http::cors::Any;
 use tower_http::cors::CorsLayer;
 
 mod auth;
+mod download;
 mod error;
 mod list_packages;
 mod publish;

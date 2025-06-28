@@ -11,7 +11,8 @@ use super::OnyxError;
 use super::OnyxState;
 use super::PACKAGE_TABLE;
 
-pub async fn list_packages(
+/// TODO
+pub async fn download_package(
     State(state): State<OnyxState>,
 ) -> Result<ResponseJson<Vec<(PackageModel, PackageVersionModel)>>, OnyxError> {
     let read = state.db.begin_read()?;

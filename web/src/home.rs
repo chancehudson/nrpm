@@ -1,39 +1,24 @@
-use db::PackageModel;
+use common::OnyxApi;
+use db::{PackageModel, PackageVersionModel};
 use dioxus::prelude::*;
-use serde_json::json;
 
-use crate::Route;
+use super::components::Header;
 
 #[component]
 pub fn HomeView() -> Element {
     let mut is_loading = use_signal(|| false);
-    let mut status = use_signal(|| None);
-    let mut packages = use_signal(|| Vec::<PackageModel>::new());
+    let mut status = use_signal(|| String::new());
+    let mut packages = use_signal(|| Vec::<(PackageModel, PackageVersionModel)>::new());
 
     let load_packages = move || {
         spawn(async move {
             is_loading.set(true);
 
-            let client = reqwest::Client::new();
-
-            match client.get("http://localhost:3000/packages").send().await {
-                Ok(response) => {
-                    if response.status().is_success() {
-                        status.set(None);
-                        packages.set(response.json().await.unwrap())
-                    } else {
-                        let status_code = response.status();
-                        let error_text = response.text().await.unwrap_or_default();
-                        status.set(Some(format!(
-                            "Failed to load packages: {} - {}",
-                            status_code, error_text
-                        )));
-                    }
-                }
-                Err(e) => {
-                    status.set(Some(format!("Error: {}", e)));
-                }
-            }
+            let api = OnyxApi::default();
+            match api.load_packages().await {
+                Ok(p) => packages.set(p),
+                Err(e) => status.set(format!("Error: {}", e)),
+            };
 
             is_loading.set(false);
         });
@@ -45,30 +30,85 @@ pub fn HomeView() -> Element {
     });
 
     rsx! {
+        Header {  },
         div {
-            style: "padding: 40px; max-width: 400px; margin: 0 auto; font-family: Arial, sans-serif;",
+            style: "padding: 40px; font-family: Arial, sans-serif;",
 
-            h1 {
-                style: "text-align: center; margin-bottom: 30px; color: #333;",
-                "Noir Package Manager"
+            h3 {
+                "Packages in this registry"
             }
 
-            div {
-                style: "display: flex; gap: 10px; margin-bottom: 20px;",
+            if !status.read().is_empty() {
+                div {
+                    style: "padding: 10px; border-radius: 4px; text-align: center; font-weight: bold;",
+                    style: if status.read().contains("successful") {
+                        "background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;"
+                    } else {
+                        "background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;"
+                    },
+                    "{status.read()}"
+                }
+            }
 
-                Link { to: Route::AuthView,
-                    button {
-                        style: "flex: 1; padding: 12px; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; transition: background-color 0.2s;",
-                        style: if is_loading() { "opacity: 0.6; cursor: not-allowed;" } else { "" },
-                        "Auth"
+            for (package, latest_version) in packages.read().iter() {
+                div {
+                    key: "{package.id}",
+                    style: "display: flex; flex-direction: column; border-left: 1px solid black; padding: 4px;",
+                    div {
+                        "name: {package.name}"
+                    },
+                    div {
+                        "latest version: {latest_version.name}"
+                    },
+                    div {
+                        "published {time_ago(latest_version.created_at)}"
+                    },
+                    div {
+                        "hash: {latest_version.hash_hex()}"
+                    }
+                    a {
+                        href: "https://afaf.com",
+                        "Download"
                     }
                 }
             }
-            ul {
-                    for package in packages.iter() {
-                        li { key: "{package.id}", "List item: {package:?}" }
-                    }
-                }
+        }
+    }
+}
+
+fn time_ago(timestamp: u64) -> String {
+    let now = js_sys::Date::now() as u64 / 1000; // Current time in seconds
+    let diff = now.saturating_sub(timestamp);
+
+    match diff {
+        0..=59 => "just now".to_string(),
+        60..=3599 => {
+            let minutes = diff / 60;
+            format!(
+                "{} minute{} ago",
+                minutes,
+                if minutes == 1 { "" } else { "s" }
+            )
+        }
+        3600..=86399 => {
+            let hours = diff / 3600;
+            format!("{} hour{} ago", hours, if hours == 1 { "" } else { "s" })
+        }
+        86400..=604799 => {
+            let days = diff / 86400;
+            format!("{} day{} ago", days, if days == 1 { "" } else { "s" })
+        }
+        604800..=2629743 => {
+            let weeks = diff / 604800;
+            format!("{} week{} ago", weeks, if weeks == 1 { "" } else { "s" })
+        }
+        2629744..=31556925 => {
+            let months = diff / 2629744;
+            format!("{} month{} ago", months, if months == 1 { "" } else { "s" })
+        }
+        _ => {
+            let years = diff / 31556926;
+            format!("{} year{} ago", years, if years == 1 { "" } else { "s" })
         }
     }
 }

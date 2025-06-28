@@ -23,7 +23,10 @@ enum Route {
 
 fn app() -> Element {
     rsx! {
-        Router::<Route> {}
+        div {
+            style: "font-family: sans-serif; margin: auto; display: flex; flex-direction: column; max-width: 800px;",
+            Router::<Route> {}
+        }
     }
 }
 

@@ -3428,6 +3428,7 @@ dependencies = [
  "dioxus-web",
  "getrandom 0.2.16",
  "gloo-storage",
+ "js-sys",
  "reqwest",
  "serde",
  "serde_json",

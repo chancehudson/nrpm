@@ -18,3 +18,4 @@ gloo-storage = "0.3"
 getrandom = { version = "0.2", features = ["js"] }
 
 web-sys = { version = "0.3", features = ["UrlSearchParams"] }
+js-sys = "0.3"

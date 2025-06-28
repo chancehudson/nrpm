@@ -11,6 +11,18 @@ pub struct PackageVersionModel {
     pub created_at: u64,
 }
 
+impl PackageVersionModel {
+    pub fn hash_hex(&self) -> String {
+        format!(
+            "0x{}",
+            self.hash
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>()
+        )
+    }
+}
+
 #[cfg(feature = "server")]
 impl redb::Value for PackageVersionModel {
     type SelfType<'a> = PackageVersionModel;
