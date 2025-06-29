@@ -20,7 +20,6 @@ async fn main() -> Result<()> {
     let api = OnyxApi::default();
     // let login = LoginResponse { user: (), token: (), expires_at: () }
     if let Some(matches) = matches.subcommand_matches("publish") {
-        let login = attempt_auth().await?;
         let cwd = std::env::current_dir()?;
         let path = matches
             .get_one::<String>("path")
@@ -33,10 +32,14 @@ async fn main() -> Result<()> {
                 }
             })
             .unwrap_or(cwd);
+        println!("📦 Packaging {:?}", path);
         let mut tarball = tarball_nrpm::create(path, tempfile()?)?;
         if let Some(archive_path) = matches.get_one::<String>("archive") {
             io::copy(&mut tarball, &mut File::create(archive_path)?)?;
         } else {
+            println!("🔃 Redirecting to authorize");
+            tokio::time::sleep(Duration::from_millis(500)).await;
+            let login = attempt_auth().await?;
             publish::upload_tarball(login, &api, &mut tarball).await?;
         }
     }
@@ -50,7 +53,9 @@ async fn attempt_auth() -> Result<LoginResponse> {
     let url = "http://localhost:8080";
     #[cfg(not(debug_assertions))]
     let url = "https://nrpm.io";
-    open::that(format!("{url}/propose_token?token={proposed_token}"))?;
+    let url = format!("{url}/propose_token?token={proposed_token}");
+    println!("    {url}");
+    open::that(url)?;
 
     let api = OnyxApi::default();
     const MAX_ATTEMPTS: usize = 60;
