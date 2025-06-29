@@ -6,6 +6,7 @@ use super::types::*;
 use crate::REGISTRY_URL;
 use crate::db::*;
 
+#[derive(Clone, Debug)]
 pub struct OnyxApi {
     pub url: String,
 }

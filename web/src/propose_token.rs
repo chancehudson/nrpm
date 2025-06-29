@@ -3,7 +3,7 @@ use onyx_api::OnyxApi;
 use web_sys::UrlSearchParams;
 
 use super::components::Auth;
-use crate::Route;
+use crate::{Route, components::Header};
 
 fn get_query_param(key: &str) -> String {
     let window = web_sys::window().unwrap();
@@ -15,6 +15,9 @@ fn get_query_param(key: &str) -> String {
 #[component]
 pub fn ProposeTokenView() -> Element {
     let navigator = use_navigator();
+
+    let auth_store = &crate::AUTH_STORE;
+
     let mut is_authed = use_signal(|| false);
     let mut status_message = use_signal(|| String::new());
     let mut is_complete = use_signal(|| false);
@@ -22,10 +25,21 @@ pub fn ProposeTokenView() -> Element {
     let handle_propose_token = move |_| {
         spawn(async move {
             let proposed_token = get_query_param("token");
-            let token = crate::load_token().unwrap_or_default();
+            let self_token = {
+                let auth_store = auth_store.read();
+                auth_store.token.read().clone()
+            };
+            if self_token.is_none() {
+                status_message.set(format!("Not authorized!"));
+                return;
+            }
 
-            let api = OnyxApi::default();
-            match api.propose_token(proposed_token, token).await {
+            match auth_store
+                .read()
+                .api
+                .propose_token(proposed_token, self_token.unwrap())
+                .await
+            {
                 Ok(()) => {
                     is_complete.set(true);
                 }
@@ -34,6 +48,7 @@ pub fn ProposeTokenView() -> Element {
         });
     };
     rsx! {
+        Header { hide_auth: false },
         if *is_authed.read() {
             if *is_complete.read() {
                 div {
@@ -55,25 +70,27 @@ pub fn ProposeTokenView() -> Element {
                         style: "text-align: center; margin-bottom: 30px; color: #333;",
                         "An application is attempting to register a token!"
                     }
+
                     div {
-                        "If this is expected, then press continue, otherwise press cancel."
-                    }
-
-                    button {
-                        onclick: handle_propose_token,
-                        style: "padding: 12px; background-color: #28a745; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; transition: background-color 0.2s;",
-                        "Continue"
-                    }
-
-                    button {
-                        onclick: {
-                            move |_| {
-                                navigator.push(Route::HomeView);
-                            }
+                        style: "display: flex; flex-direction: row; align-items: center; justify-content: center;",
+                        button {
+                            onclick: handle_propose_token,
+                            style: "padding: 12px; background-color: #28a745; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; transition: background-color 0.2s;",
+                            "Allow"
+                        }
+                        div {
+                            style: "width: 8px"
                         },
-                        style: "padding: 12px; background-color: #28a745; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; transition: background-color 0.2s;",
-                        "Cancel"
-                    }
+                        button {
+                            onclick: {
+                                move |_| {
+                                    navigator.push(Route::HomeView);
+                                }
+                            },
+                            style: "padding: 12px; background-color: #f87171; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; transition: background-color 0.2s;",
+                            "Abort"
+                        }
+                    },
 
                     if !status_message.read().is_empty() {
                         div {

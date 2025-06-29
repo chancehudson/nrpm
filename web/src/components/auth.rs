@@ -1,4 +1,5 @@
 use dioxus::prelude::*;
+
 use onyx_api::prelude::*;
 
 #[derive(Props, Clone, PartialEq)]
@@ -9,76 +10,69 @@ pub struct AuthProps {
 
 #[component]
 pub fn Auth(props: AuthProps) -> Element {
-    let mut auth_maybe = use_signal(|| crate::load_token());
+    let auth_store = &crate::AUTH_STORE;
+
     let mut username = use_signal(|| String::new());
     let mut password = use_signal(|| String::new());
     let status_message = use_signal(|| String::new());
-    let is_loading = use_signal(|| false);
 
-    let handle_login = move |_| {
-        let username_val = username.read().clone();
-        let password_val = password.read().clone();
-        let mut status = status_message.clone();
-        let mut loading = is_loading.clone();
+    let is_loading = auth_store.read().is_loading().clone();
+    let login = auth_store.read().login.read().clone();
 
-        spawn(async move {
-            loading.set(true);
-            status.set("Logging in...".to_string());
+    let handle_login = {
+        move |_| {
+            let username_val = username.read().clone();
+            let password_val = password.read().clone();
+            let mut status = status_message.clone();
+            spawn(async move {
+                status.set("Logging in...".to_string());
 
-            let api = OnyxApi::default();
-            match api
-                .login(LoginRequest {
-                    username: username_val,
-                    password: password_val,
-                })
-                .await
-            {
-                Ok(login) => {
-                    status.set("Login successful!".to_string());
-                    crate::save_token(&login.token).unwrap();
-                    auth_maybe.set(Some(login.token));
-                    props.on_auth.call(());
-                }
-                Err(e) => status.set(format!("Login failed: {e}")),
-            };
-
-            loading.set(false);
-        });
+                let api = auth_store.with(|v| v.api.clone());
+                match api
+                    .login(LoginRequest {
+                        username: username_val,
+                        password: password_val,
+                    })
+                    .await
+                {
+                    Ok(login) => {
+                        auth_store.with_mut(|v| v.set_login(login));
+                        props.on_auth.call(());
+                    }
+                    Err(e) => status.set(format!("Login failed: {e}")),
+                };
+            });
+        }
     };
 
-    let handle_signup = move |_| {
-        let username_val = username.read().clone();
-        let password_val = password.read().clone();
-        let mut status = status_message.clone();
-        let mut loading = is_loading.clone();
+    let handle_signup = {
+        move |_| {
+            let username_val = username.read().clone();
+            let password_val = password.read().clone();
+            let mut status = status_message.clone();
 
-        spawn(async move {
-            loading.set(true);
-            status.set("Signing up...".to_string());
+            spawn(async move {
+                status.set("Signing up...".to_string());
 
-            let api = OnyxApi::default();
-            match api
-                .signup(LoginRequest {
-                    username: username_val,
-                    password: password_val,
-                })
-                .await
-            {
-                Ok(login) => {
-                    status.set("Signup successful!".to_string());
-                    crate::save_token(&login.token).unwrap();
-                    auth_maybe.set(Some(login.token));
-                    props.on_auth.call(());
-                }
-                Err(e) => status.set(format!("Signup failed: {e}")),
-            };
-
-            loading.set(false);
-        });
+                let api = auth_store.with(|v| v.api.clone());
+                match api
+                    .signup(LoginRequest {
+                        username: username_val,
+                        password: password_val,
+                    })
+                    .await
+                {
+                    Ok(login) => {
+                        auth_store.with_mut(|v| v.set_login(login));
+                        props.on_auth.call(());
+                    }
+                    Err(e) => status.set(format!("Signup failed: {e}")),
+                };
+            });
+        }
     };
-
     rsx! {
-        if let Some(auth) = auth_maybe() {
+        if let Some(_login) = login {
             div {
                 style: "padding: 40px; max-width: 400px; margin: 0 auto; font-family: Arial, sans-serif;",
 
@@ -103,8 +97,7 @@ pub fn Auth(props: AuthProps) -> Element {
                     button {
                         onclick: {
                             move |_| {
-                                crate::remove_token();
-                                auth_maybe.set(None);
+                                auth_store.write().clear_login();
                             }
                         },
                         style: "padding: 12px; background-color: #28a745; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; transition: background-color 0.2s;",
@@ -156,17 +149,17 @@ pub fn Auth(props: AuthProps) -> Element {
 
                     button {
                         onclick: handle_login,
-                        disabled: is_loading(),
+                        disabled: is_loading,
                         style: "flex: 1; padding: 12px; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; transition: background-color 0.2s;",
-                        style: if is_loading() { "opacity: 0.6; cursor: not-allowed;" } else { "" },
+                        style: if is_loading { "opacity: 0.6; cursor: not-allowed;" } else { "" },
                         "Login"
                     }
 
                     button {
                         onclick: handle_signup,
-                        disabled: is_loading(),
+                        disabled: is_loading,
                         style: "flex: 1; padding: 12px; background-color: #28a745; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; transition: background-color 0.2s;",
-                        style: if is_loading() { "opacity: 0.6; cursor: not-allowed;" } else { "" },
+                        style: if is_loading { "opacity: 0.6; cursor: not-allowed;" } else { "" },
                         "Signup"
                     }
                 }

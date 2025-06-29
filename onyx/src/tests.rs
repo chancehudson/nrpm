@@ -86,10 +86,7 @@ impl OnyxTest {
     }
 
     pub async fn login(&self, request: Option<LoginRequest>) -> Result<LoginResponse> {
-        let request = request.unwrap_or(LoginRequest {
-            username: nanoid!(),
-            password: nanoid!(),
-        });
+        let request = request.unwrap_or_default();
         self.api.login(request).await
     }
 

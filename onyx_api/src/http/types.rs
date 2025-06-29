@@ -1,3 +1,4 @@
+use nanoid::nanoid;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -28,13 +29,22 @@ pub struct PublishResponse {
     pub package_id: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct LoginRequest {
     pub username: String,
     pub password: String,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+impl Default for LoginRequest {
+    fn default() -> Self {
+        Self {
+            username: nanoid!(),
+            password: nanoid!(),
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 pub struct LoginResponse {
     pub user: UserModelSafe,
     pub token: String,

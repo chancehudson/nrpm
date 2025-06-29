@@ -26,6 +26,9 @@ impl Default for OnyxStorage {
 
 impl OnyxStorage {
     pub fn new(storage_path: PathBuf) -> Result<Self> {
+        if !fs::exists(&storage_path)? {
+            anyhow::bail!("Storage directory does not exist: {:?}", storage_path);
+        }
         Ok(Self { storage_path })
     }
 
@@ -54,7 +57,9 @@ impl OnyxStorage {
         file.seek(SeekFrom::Start(0))?;
         let mut bytes = vec![];
         file.read_to_end(&mut bytes)?;
+        println!("adfjkafd {:?}", to_path);
         let mut to_file = File::create(to_path)?;
+        println!("b2");
         to_file.write_all(&mut bytes)?;
         Ok(())
     }
