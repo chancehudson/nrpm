@@ -3,6 +3,8 @@ name = "nrpm_tarball"
 version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
+description = "tarballs for noir package manager"
+repository = "https://github.com/chancehudson/nrpm.git"
 
 [dependencies]
 anyhow = { workspace = true }
