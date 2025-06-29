@@ -1,8 +1,10 @@
 [package]
-name = "cli"
+name = "nrpm"
 version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
+description = "cli for interacting with noir package manager"
+repository = "https://github.com/chancehudson/nrpm.git"
 
 [[bin]]
 name = "nrpm"
