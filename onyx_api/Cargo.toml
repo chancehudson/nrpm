@@ -2,6 +2,9 @@
 name = "onyx_api"
 version = "0.1.0"
 edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "api for interacting with onyx servers"
+repository = "https://github.com/chancehudson/nrpm.git"
 
 [features]
 server = ["redb", "bincode", "publish", "tokio"]
