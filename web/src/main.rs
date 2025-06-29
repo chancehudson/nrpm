@@ -32,5 +32,6 @@ fn app() -> Element {
 }
 
 fn main() {
+    gloo_utils::document().set_title("Noir Package Manager");
     launch(app);
 }

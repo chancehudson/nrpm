@@ -3439,6 +3439,7 @@ dependencies = [
  "dioxus-web",
  "getrandom 0.2.16",
  "gloo-storage",
+ "gloo-utils",
  "js-sys",
  "onyx_api",
  "reqwest",
