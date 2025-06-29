@@ -15,8 +15,8 @@ reqwest = { workspace = true }
 nanoid = { workspace = true }
 bincode = { workspace = true }
 
-onyx_api = { path = "../onyx_api", features = ["server"] }
-nrpm_tarball = { path = "../nrpm_tarball" }
+onyx_api = { workspace = true, features = ["server"] }
+nrpm_tarball = { workspace = true }
 
 axum = { version = "0.8.4", features = ["http2", "multipart"] }
 rand = "0.9.1"
