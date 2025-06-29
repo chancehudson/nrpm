@@ -33,7 +33,7 @@ async fn main() -> Result<()> {
                 }
             })
             .unwrap_or(cwd);
-        let mut tarball = tarball::create(path, tempfile()?)?;
+        let mut tarball = tarball_nrpm::create(path, tempfile()?)?;
         if let Some(archive_path) = matches.get_one::<String>("archive") {
             io::copy(&mut tarball, &mut File::create(archive_path)?)?;
         } else {
@@ -46,17 +46,20 @@ async fn main() -> Result<()> {
 async fn attempt_auth() -> Result<LoginResponse> {
     let proposed_token = nanoid!();
     // we'll create a token and open the web browser
-    open::that(format!(
-        "http://localhost:8080/propose_token?token={proposed_token}"
-    ))?;
+    #[cfg(debug_assertions)]
+    let url = "http://localhost:8080";
+    #[cfg(not(debug_assertions))]
+    let url = "https://nrpm.io";
+    open::that(format!("{url}/propose_token?token={proposed_token}"))?;
+
     let api = OnyxApi::default();
-    const MAX_ATTEMPTS: usize = 30;
+    const MAX_ATTEMPTS: usize = 60;
     let mut attempts = 0;
     loop {
         tokio::time::sleep(Duration::from_millis(1000)).await;
         match api.auth(proposed_token.clone()).await {
             Ok(login) => return Ok(login),
-            Err(e) => {
+            Err(_) => {
                 attempts += 1;
                 if attempts >= MAX_ATTEMPTS {
                     anyhow::bail!("Timed out waiting for token to activate!")

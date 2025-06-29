@@ -7,7 +7,7 @@ use dialoguer::Input;
 use onyx_api::prelude::*;
 
 pub async fn upload_tarball(login: LoginResponse, api: &OnyxApi, tarball: &mut File) -> Result<()> {
-    let hash = tarball::hash(tarball)?;
+    let hash = tarball_nrpm::hash(tarball)?;
     // reset the file handle for copying to final destination
     tarball.seek(std::io::SeekFrom::Start(0))?;
     let mut tarball_bytes = vec![];

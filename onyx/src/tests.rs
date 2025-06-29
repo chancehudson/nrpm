@@ -62,9 +62,9 @@ impl OnyxTest {
         let workdir = tempfile::TempDir::new()?;
         std::fs::write(workdir.path().join("aaaaa"), content)?;
         let tar_file = tempfile()?;
-        let mut tarball = tarball::create(workdir.path().to_path_buf(), tar_file)?;
+        let mut tarball = tarball_nrpm::create(workdir.path().to_path_buf(), tar_file)?;
         let mut tarball_clone = tarball.try_clone()?;
-        let hash = tarball::hash(&mut tarball)?;
+        let hash = tarball_nrpm::hash(&mut tarball)?;
 
         tarball_clone.seek(std::io::SeekFrom::Start(0))?;
         let mut tarball_bytes = vec![];

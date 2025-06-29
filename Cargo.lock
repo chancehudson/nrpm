@@ -463,7 +463,7 @@ dependencies = [
  "reqwest",
  "serde",
  "tar",
- "tarball",
+ "tarball_nrpm",
  "tempfile",
  "tokio",
 ]
@@ -2057,7 +2057,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "tarball",
+ "tarball_nrpm",
  "tempfile",
  "tokio",
  "tokio-util",
@@ -2897,7 +2897,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tarball"
+name = "tarball_nrpm"
 version = "0.1.0"
 dependencies = [
  "anyhow",

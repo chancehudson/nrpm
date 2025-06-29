@@ -17,4 +17,5 @@ bincode = { workspace = true, optional = true }
 blake3 = { workspace = true }
 nanoid = { workspace = true }
 tokio = { workspace = true, optional = true }
+
 hex = "0.4.3"

@@ -13,16 +13,16 @@ blake3 = { workspace = true }
 redb = { workspace = true }
 reqwest = { workspace = true }
 nanoid = { workspace = true }
+bincode = { workspace = true }
 
 onyx_api = { path = "../onyx_api", features = ["server"] }
-tarball = { path = "../tarball" }
+tarball_nrpm = { path = "../tarball_nrpm" }
 
 axum = { version = "0.8.4", features = ["http2", "multipart"] }
 rand = "0.9.1"
 bcrypt = "0.17.0"
 tower-http = { version = "0.6.6", features = ["cors"] }
 
-bincode = { version = "1.0.0" }
 tokio-util = "0.7.15"
 
 [dev-dependencies]

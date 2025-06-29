@@ -8,6 +8,10 @@ license = "MIT OR Apache-2.0"
 name = "nrpm"
 path = "src/main.rs"
 
+[features]
+default = ["onyx_api", "tarball_nrpm"]
+#release = ["onyx_api_release", "tarball_nrpm_release"]
+
 [dependencies]
 anyhow = { workspace = true }
 serde = { workspace = true }
@@ -18,8 +22,11 @@ tempfile = { workspace = true }
 reqwest = { workspace = true }
 nanoid = { workspace = true }
 
-onyx_api = { path = "../onyx_api", features = ["publish"] }
-tarball = { path = "../tarball" }
+#onyx_api_release = { package = "onyx_api", version = "0.0.0", optional = true }
+onyx_api = { path = "../onyx_api", features = ["publish"], optional = true }
+
+#tarball_nrpm_release = { version = "0.0.0", optional = true }
+tarball_nrpm = { path = "../tarball_nrpm", optional = true }
 
 clap = "4.5.40"
 dialoguer = "0.11.0"
