@@ -71,6 +71,14 @@ pub fn Auth(props: AuthProps) -> Element {
             });
         }
     };
+    if is_loading {
+        return rsx! {
+            h3 {
+                style: "padding: 40px; max-width: 400px; margin: 0 auto; font-family: Arial, sans-serif;",
+                "Loading authentication..."
+            }
+        };
+    }
     rsx! {
         if let Some(_login) = login {
             div {
@@ -176,6 +184,6 @@ pub fn Auth(props: AuthProps) -> Element {
                     }
                 }
             }
-    }
+        }
     }
 }
