@@ -3,7 +3,7 @@ use dioxus::prelude::*;
 use crate::Route;
 
 #[component]
-pub fn Header(hide_auth: bool) -> Element {
+pub fn Header(show_auth: bool) -> Element {
     let auth_store = &crate::AUTH_STORE;
 
     rsx! {
@@ -18,7 +18,7 @@ pub fn Header(hide_auth: bool) -> Element {
                     }
                 }
             },
-            if !hide_auth {
+            if show_auth {
                 div {
                     style: "display: flex; flex-direction: column; align-items: flex-end;",
                     if let Some(login) = auth_store.read().login.read().as_ref() {

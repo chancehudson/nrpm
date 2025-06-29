@@ -48,7 +48,7 @@ pub fn ProposeTokenView() -> Element {
         });
     };
     rsx! {
-        Header { hide_auth: false },
+        Header { show_auth: true },
         if *is_authed.read() {
             if *is_complete.read() {
                 div {

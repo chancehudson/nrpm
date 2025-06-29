@@ -33,7 +33,7 @@ pub fn HomeView() -> Element {
     });
 
     rsx! {
-        Header { hide_auth: false },
+        Header { show_auth: true },
         div {
             style: "padding: 40px; font-family: Arial, sans-serif;",
 

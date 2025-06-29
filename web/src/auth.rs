@@ -8,7 +8,7 @@ use crate::Route;
 pub fn AuthView() -> Element {
     let navigator = use_navigator();
     rsx! {
-        Header { hide_auth: true },
+        Header { show_auth: false },
         Auth {
             on_auth: move |_| {
                 navigator.push(Route::HomeView);
