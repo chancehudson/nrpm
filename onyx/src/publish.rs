@@ -92,7 +92,7 @@ pub async fn publish(
     let mut tarball = tempfile()?;
     tarball.write_all(&tarball_data)?;
 
-    let actual_hash = tarball_nrpm::hash(&mut tarball)?;
+    let actual_hash = nrpm_tarball::hash(&mut tarball)?;
 
     if blake3::Hash::from_hex(publish_data.hash)? != actual_hash {
         println!("WARNING: hash mismatch for uploaded package, computed: {actual_hash}");

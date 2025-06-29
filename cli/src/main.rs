@@ -33,7 +33,7 @@ async fn main() -> Result<()> {
             })
             .unwrap_or(cwd);
         println!("📦 Packaging {:?}", path);
-        let mut tarball = tarball_nrpm::create(path, tempfile()?)?;
+        let mut tarball = nrpm_tarball::create(path, tempfile()?)?;
         if let Some(archive_path) = matches.get_one::<String>("archive") {
             io::copy(&mut tarball, &mut File::create(archive_path)?)?;
         } else {

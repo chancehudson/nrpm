@@ -121,12 +121,4 @@ pub fn create(path: PathBuf, tar_file: File) -> Result<File> {
 }
 
 #[cfg(test)]
-mod tests {
-    fn generate_hash() {
-        // let workdir = tempfile::TempDir::new()?;
-        // fs::write(workdir.path().join("aaaaa"), "testcontents\n")?;
-        // let tarball = create_tarball(workdir.path().to_path_buf())?;
-        // let mut tarball_clone = tarball.try_clone()?;
-        // let hash = hash_tarball(&tarball)?;
-    }
-}
+mod tests {}

@@ -1,9 +1,9 @@
 use dioxus::prelude::*;
-use onyx_api::OnyxApi;
 use web_sys::UrlSearchParams;
 
 use super::components::Auth;
-use crate::{Route, components::Header};
+use crate::Route;
+use crate::components::Header;
 
 fn get_query_param(key: &str) -> String {
     let window = web_sys::window().unwrap();

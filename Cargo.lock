@@ -458,12 +458,12 @@ dependencies = [
  "clap",
  "dialoguer",
  "nanoid",
+ "nrpm_tarball",
  "onyx_api",
  "open",
  "reqwest",
  "serde",
  "tar",
- "tarball_nrpm",
  "tempfile",
  "tokio",
 ]
@@ -2005,6 +2005,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "nrpm_tarball"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "blake3",
+ "ignore",
+ "nanoid",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tar",
+ "tempfile",
+]
+
+[[package]]
 name = "num-conv"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2051,13 +2067,13 @@ dependencies = [
  "bincode",
  "blake3",
  "nanoid",
+ "nrpm_tarball",
  "onyx_api",
  "rand 0.9.1",
  "redb",
  "reqwest",
  "serde",
  "serde_json",
- "tarball_nrpm",
  "tempfile",
  "tokio",
  "tokio-util",
@@ -2894,22 +2910,6 @@ dependencies = [
  "filetime",
  "libc",
  "xattr",
-]
-
-[[package]]
-name = "tarball_nrpm"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bincode",
- "blake3",
- "ignore",
- "nanoid",
- "reqwest",
- "serde",
- "serde_json",
- "tar",
- "tempfile",
 ]
 
 [[package]]
