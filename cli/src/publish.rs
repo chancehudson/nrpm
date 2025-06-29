@@ -23,7 +23,6 @@ pub async fn upload_tarball(login: LoginResponse, api: &OnyxApi, tarball: &mut F
             PublishData {
                 hash: hash.to_string(),
                 token: login.token,
-                package_id: None,
                 package_name: package_name.clone(),
                 version_name: version_name.clone(),
             },

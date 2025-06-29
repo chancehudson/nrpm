@@ -31,10 +31,11 @@ pub mod tables {
         TableDefinition::new("packages");
     // used to ensure package names are unique
     // TODO: sort by semver ordering for efficient latest version lookups
-    pub const PACKAGE_NAME_TABLE: TableDefinition<&str, ()> = TableDefinition::new("package_names");
+    pub const PACKAGE_NAME_TABLE: TableDefinition<&str, NanoId> =
+        TableDefinition::new("package_names");
     // used to prevent multiple versions with the same name for a single package
     // (package_id, version_name) keyed to ()
-    pub const PACKAGE_VERSION_NAME_TABLE: TableDefinition<(NanoId, &str), ()> =
+    pub const PACKAGE_VERSION_NAME_TABLE: TableDefinition<(NanoId, &str), HashId> =
         TableDefinition::new("package_version_name");
     // package_id keyed to many versions
     pub const PACKAGE_VERSION_TABLE: MultimapTableDefinition<NanoId, HashId> =

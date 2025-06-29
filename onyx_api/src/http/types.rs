@@ -19,7 +19,6 @@ pub struct ProposeToken {
 pub struct PublishData {
     pub hash: String,
     pub token: String,
-    pub package_id: Option<String>, // None if creating a new package
     pub package_name: String,
     pub version_name: String,
 }

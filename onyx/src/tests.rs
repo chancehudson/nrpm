@@ -98,7 +98,6 @@ impl OnyxTest {
         let data = request.unwrap_or(PublishData {
             hash: tarball.1.to_string(),
             token: nanoid!(),
-            package_id: None,
             package_name: nanoid!(),
             version_name: nanoid!(),
         });
