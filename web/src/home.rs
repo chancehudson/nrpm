@@ -15,11 +15,14 @@ pub fn HomeView() -> Element {
 
             let api = OnyxApi::default();
             match api.load_packages().await {
-                Ok(p) => packages.set(
-                    p.into_iter()
+                Ok(p) => {
+                    let mut a = p
+                        .into_iter()
                         .map(|(p, v)| (p, v.clone(), api.version_download_url(v.id)))
-                        .collect::<Vec<_>>(),
-                ),
+                        .collect::<Vec<_>>();
+                    a.sort_by(|v0, v1| v1.1.created_at.cmp(&v0.1.created_at));
+                    packages.set(a);
+                }
                 Err(e) => status.set(format!("Error: {}", e)),
             };
 
