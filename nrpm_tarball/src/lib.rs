@@ -121,9 +121,25 @@ pub fn create(path: &Path, tar_file: File) -> Result<File> {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, os::unix::fs::PermissionsExt};
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
 
     use super::*;
+
+    #[test]
+    fn should_return_start_of_tarball() -> Result<()> {
+        let tar_file = tempfile::tempfile()?;
+        let tempdir = tempfile::tempdir()?;
+
+        let test_file = tempdir.path().join("test.txt");
+        fs::write(test_file, "test")?;
+
+        let mut tarball = create(tempdir.path(), tar_file)?;
+
+        assert_eq!(tarball.stream_position()?, 0);
+
+        Ok(())
+    }
 
     #[test]
     fn should_use_local_gitignore() -> Result<()> {
@@ -143,9 +159,7 @@ mod tests {
         let test_file = tempdir.path().join("test.txt");
         fs::write(test_file, "test")?;
 
-        let mut tarball = create(tempdir.path(), tar_file)?;
-
-        tarball.seek(SeekFrom::Start(0))?;
+        let tarball = create(tempdir.path(), tar_file)?;
 
         let mut archive = Archive::new(tarball);
 
@@ -188,9 +202,7 @@ mod tests {
         let test_file = content_dir.join("test.txt");
         fs::write(test_file, "test")?;
 
-        let mut tarball = create(&content_dir, tar_file)?;
-
-        tarball.seek(SeekFrom::Start(0))?;
+        let tarball = create(&content_dir, tar_file)?;
 
         let mut archive = Archive::new(tarball);
 
@@ -215,9 +227,7 @@ mod tests {
         let test_file = tempdir.path().join(".hidden.txt");
         fs::write(test_file, "test")?;
 
-        let mut tarball = create(tempdir.path(), tar_file)?;
-
-        tarball.seek(SeekFrom::Start(0))?;
+        let tarball = create(tempdir.path(), tar_file)?;
 
         let mut archive = Archive::new(tarball);
 
@@ -252,9 +262,7 @@ mod tests {
         let test_file = tempdir.path().join("test.txt");
         fs::write(test_file, "test")?;
 
-        let mut tarball = create(tempdir.path(), tar_file)?;
-
-        tarball.seek(SeekFrom::Start(0))?;
+        let tarball = create(tempdir.path(), tar_file)?;
 
         let mut archive = Archive::new(tarball);
 
@@ -284,9 +292,8 @@ mod tests {
         let file_path = tempdir.path().join("test.txt");
         fs::write(&file_path, "test")?;
 
-        let mut tarball = create(tempdir.path(), tar_file)?;
+        let tarball = create(tempdir.path(), tar_file)?;
 
-        tarball.seek(SeekFrom::Start(0))?;
         let mut archive = Archive::new(tarball);
 
         let mut found_files = Vec::new();
