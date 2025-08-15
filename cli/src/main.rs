@@ -56,7 +56,7 @@ async fn run() -> Result<()> {
         } else {
             anyhow::bail!("Unable to stat path: {:?}", path);
         }
-        let mut tarball = nrpm_tarball::create(path, tempfile()?)?;
+        let mut tarball = nrpm_tarball::create(&path, tempfile()?)?;
         if let Some(archive_path) = matches.get_one::<String>("archive") {
             io::copy(&mut tarball, &mut File::create(archive_path)?)?;
         } else {
