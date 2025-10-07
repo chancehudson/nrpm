@@ -7,7 +7,7 @@ description = "api for interacting with onyx servers"
 repository = "https://github.com/chancehudson/nrpm.git"
 
 [features]
-server = ["redb", "bincode", "publish", "tokio"]
+server = ["redb", "bincode", "publish", "tokio", "nrpm_tarball"]
 publish = ["bincode"]
 
 [dependencies]
@@ -20,5 +20,7 @@ bincode = { workspace = true, optional = true }
 blake3 = { workspace = true }
 nanoid = { workspace = true }
 tokio = { workspace = true, optional = true }
+
+nrpm_tarball = { workspace = true, optional = true }
 
 hex = "0.4.3"

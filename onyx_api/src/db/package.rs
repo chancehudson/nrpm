@@ -1,3 +1,8 @@
+use std::sync::Arc;
+
+use anyhow::Result;
+#[cfg(feature = "server")]
+use redb::Database;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -9,6 +14,37 @@ pub struct PackageModel {
     pub name: String,
     pub author_id: String,
     pub latest_version_id: HashId,
+}
+
+#[cfg(feature = "server")]
+impl PackageModel {
+    pub fn package_by_name(db: Arc<Database>, name: &str) -> Result<Option<Self>> {
+        let read = db.begin_read()?;
+        let package_table = read.open_table(PACKAGE_TABLE)?;
+        let package_name_table = read.open_table(PACKAGE_NAME_TABLE)?;
+        if let Some(package_id) = package_name_table.get(name)?
+            && let Some(package) = package_table.get(package_id.value())?
+        {
+            Ok(Some(package.value()))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn latest_version(db: Arc<Database>, name: &str) -> Result<Option<PackageVersionModel>> {
+        let read = db.begin_read()?;
+        let package_table = read.open_table(PACKAGE_TABLE)?;
+        let package_name_table = read.open_table(PACKAGE_NAME_TABLE)?;
+        let version_table = read.open_table(VERSION_TABLE)?;
+        if let Some(package_id) = package_name_table.get(name)?
+            && let Some(package) = package_table.get(package_id.value())?
+            && let Some(version) = version_table.get(package.value().latest_version_id)?
+        {
+            Ok(Some(version.value()))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 #[cfg(feature = "server")]

@@ -55,6 +55,7 @@ pub async fn publish(
             ));
         }
     };
+    // check that we are authenticated
     let read = state.db.begin_read()?;
     let auth_table = read.open_table(AUTH_TOKEN_TABLE)?;
     let user_id = if let Some(entry) = auth_table.get(publish_data.token.as_str())? {
@@ -87,6 +88,7 @@ pub async fn publish(
 
     // now write our package to the db
     let write = state.db.begin_write()?;
+
     let package = {
         let mut package_table = write.open_table(PACKAGE_TABLE)?;
         let mut package_version_table = write.open_multimap_table(PACKAGE_VERSION_TABLE)?;
@@ -99,6 +101,7 @@ pub async fn publish(
 
         let package =
             if let Some(package_id) = package_name_table.get(publish_data.package_name.as_str())? {
+                // the package name is already in use
                 // make sure we're the author of the package
                 let mut package = if let Some(package) = package_table.get(package_id.value())? {
                     package.value()
@@ -110,10 +113,12 @@ pub async fn publish(
                         "You are not authorized to publish versions of this package",
                     ));
                 }
+                // we're publishing a new version of an existing package
                 package.latest_version_id = version_id.clone();
                 package_table.insert(package_id.value(), package.clone())?;
                 package
             } else {
+                // this is a completely new package
                 let package = PackageModel {
                     id: nanoid!(),
                     name: publish_data.package_name,
@@ -130,7 +135,7 @@ pub async fn publish(
         } else {
             if let Err(e) = state
                 .storage
-                .ingest_file(&mut tarball, HashId::from(actual_hash).to_string())
+                .ingest_tarball(&mut tarball, HashId::from(actual_hash).to_string())
             {
                 println!(
                     "WARNING: package already exists with hash: {} {}",

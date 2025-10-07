@@ -1,0 +1,138 @@
+use std::fs::File;
+use std::io::Read;
+use std::sync::atomic::AtomicBool;
+
+use anyhow::Result;
+use gix::ObjectId;
+use gix::actor::SignatureRef;
+use gix::parallel::InOrderIter;
+use gix_pack::data::output::bytes::FromEntriesIter;
+use gix_pack::data::output::count::objects;
+use gix_pack::data::output::count::objects::ObjectExpansion;
+use gix_pack::data::output::count::objects::Options;
+use gix_pack::data::output::entry::iter_from_counts;
+use tar::Archive;
+use tar::EntryType;
+use tempfile::tempdir;
+
+/// Take a tarball and create a git repository with a single commit containing the contents of the
+/// tarball. Take this repo and create a git-upload-pack file and a info/refs file suitable for mocking a
+/// response to `git clone`. Return these values.
+///
+/// These response values are formatted in such a way that they can be sent directly across the
+/// wire.
+///
+/// This function assumes the tarball is untrusted.
+///
+/// Returns, `(refs, pack_bytes)`, both ready to be sent over the wire to a git client.
+pub fn extract_git_mock(tarball: &mut File) -> Result<(String, Vec<u8>)> {
+    // TODO: similar safety to nrpm_tarball::hash
+    //
+    let mut archive = Archive::new(tarball);
+    let git_dir = tempdir()?;
+
+    // TODO: make sure user git configurations aren't being read here or doing nasty things
+    let repo = gix::init(git_dir.path())?;
+    let mut editor = repo.edit_tree(ObjectId::empty_tree(gix::hash::Kind::Sha1))?;
+    for entry in archive.entries()? {
+        let mut entry = entry?;
+        match entry.header().entry_type() {
+            EntryType::Regular => {
+                // TODO: safety checks here
+                let path = entry.path()?.to_path_buf();
+                let mut bytes = Vec::default();
+                entry.read_to_end(&mut bytes)?;
+                let oid = repo.write_blob(bytes)?;
+                editor.upsert(
+                    path.to_string_lossy().to_string(),
+                    gix::objs::tree::EntryKind::Blob,
+                    oid,
+                )?;
+            }
+            EntryType::Directory => {
+                continue;
+            }
+            _ => anyhow::bail!(
+                "Irregular entry detected in tar archive. Only directories and files are allowed in package tarballs!"
+            ),
+        }
+    }
+
+    let tree_id = editor.write()?;
+    let commit_id = repo.commit_as(
+        SignatureRef::default(),
+        SignatureRef::default(),
+        "HEAD",
+        "default package commit",
+        tree_id,
+        Vec::<ObjectId>::default(),
+    )?;
+
+    // create the main branch
+    repo.reference(
+        "refs/heads/main",
+        commit_id,
+        gix::refs::transaction::PreviousValue::MustNotExist,
+        "create main branch",
+    )?;
+
+    let mut handle = repo.objects.store().to_handle();
+    handle.prevent_pack_unload();
+
+    // now our repo has a commit, let's build a git-upload-pack and a ref list to statically serve
+
+    let (counts, outcome) = objects(
+        handle,
+        Box::new(vec![Ok(ObjectId::from(commit_id))].into_iter()),
+        &gix::features::progress::Discard,
+        &AtomicBool::new(false),
+        Options {
+            input_object_expansion: ObjectExpansion::TreeContents,
+            ..Default::default()
+        },
+    )?;
+    let mut handle = repo.objects.store().to_handle();
+    handle.prevent_pack_unload();
+    let pack_iter = iter_from_counts(
+        counts,
+        handle,
+        Box::new(gix::features::progress::Discard),
+        Default::default(),
+    );
+    let mut pack_bytes = Vec::new();
+    // exhaust the iterator to finish packing
+    for entry in FromEntriesIter::new(
+        InOrderIter::from(pack_iter),
+        // file,
+        &mut pack_bytes,
+        outcome.total_objects as u32,
+        gix_pack::data::Version::V2,
+        gix::hash::Kind::Sha1,
+    ) {
+        entry?;
+    }
+
+    fn pkt_line(data: &str) -> String {
+        let len = data.len() + 4;
+        format!("{:04x}{}", len, data)
+    }
+
+    let refs_response = format!(
+        "001e# service=git-upload-pack
+0000{}{}0000",
+        pkt_line(&format!(
+            "{} HEAD\0multi_ack_detailed thin-pack ofs-delta no-progress shallow symref=HEAD:refs/heads/main object-format=sha1\n",
+            commit_id.to_hex().to_string()
+        )),
+        pkt_line(&format!(
+            "{} refs/heads/main\n",
+            &commit_id.to_hex().to_string()
+        )),
+    );
+
+    let mut upload_pack_response = Vec::new();
+    upload_pack_response.extend_from_slice(b"0008NAK\n");
+    upload_pack_response.extend_from_slice(&pack_bytes);
+
+    Ok((refs_response, upload_pack_response))
+}

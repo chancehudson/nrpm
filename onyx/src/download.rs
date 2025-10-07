@@ -20,7 +20,10 @@ pub async fn download_package(
     State(state): State<OnyxState>,
     Path(id): Path<String>,
 ) -> Result<Response, OnyxError> {
-    let reader = state.storage.reader_async(&id).await?;
+    let reader = state
+        .storage
+        .reader_async(&id, onyx_api::prelude::FileType::Tarball)
+        .await?;
 
     let stream = ReaderStream::new(reader);
     let body = Body::from_stream(stream);

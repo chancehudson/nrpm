@@ -12,9 +12,15 @@ use ignore::WalkBuilder;
 use tar::Archive;
 use tar::EntryType;
 
+mod git;
+
+pub use git::extract_git_mock;
+
 /// Take a tar archive and calculate a content based hash. Each file is separately hashed
 /// by hashing each path component followed by contents. A final hash is created by combining
 /// all file hashes in lexicographic order of file paths.
+///
+/// This function assumes the tarball is untrusted.
 pub fn hash(tarball: &mut File) -> Result<blake3::Hash> {
     tarball.seek(SeekFrom::Start(0))?;
     let mut archive = Archive::new(tarball);

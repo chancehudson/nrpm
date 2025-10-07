@@ -16,6 +16,12 @@ pub struct OnyxStorage {
     pub storage_path: PathBuf,
 }
 
+pub enum FileType {
+    GitRefs,
+    GitPack,
+    Tarball,
+}
+
 impl Default for OnyxStorage {
     fn default() -> Self {
         let storage_path = temp_dir().join(nanoid!());
@@ -40,18 +46,51 @@ impl OnyxStorage {
         self.storage_path.join(filename)
     }
 
+    pub fn name_to_refs_path(&self, filename: &str) -> PathBuf {
+        #[cfg(debug_assertions)]
+        if filename.contains("/") {
+            println!("WARNING: reader expects a filename, not a filepath");
+        }
+        self.storage_path.join(format!("git-refs-{filename}"))
+    }
+
+    pub fn name_to_pack_path(&self, filename: &str) -> PathBuf {
+        #[cfg(debug_assertions)]
+        if filename.contains("/") {
+            println!("WARNING: reader expects a filename, not a filepath");
+        }
+        self.storage_path.join(format!("git-pack-{filename}"))
+    }
+
     /// Get a reader for filename in this storage
-    pub async fn reader_async(&self, filename: &str) -> Result<tokio::fs::File> {
-        let read_path = self.name_to_path(&filename);
+    pub async fn reader_async(
+        &self,
+        filename: &str,
+        file_type: FileType,
+    ) -> Result<tokio::fs::File> {
+        let read_path = match file_type {
+            FileType::GitRefs => self.name_to_refs_path(filename),
+            FileType::GitPack => self.name_to_pack_path(filename),
+            FileType::Tarball => self.name_to_path(filename),
+        };
         Ok(tokio::fs::File::open(read_path).await?)
     }
 
-    /// Move a file at a path into this storage
-    pub fn ingest_file(&self, file: &mut File, filename: String) -> Result<()> {
+    /// Ingest a tarball by performing sanity/safety checks, extracting to directory, and creating
+    /// a mocked git response for Nargo compatibility.
+    pub fn ingest_tarball(&self, file: &mut File, filename: String) -> Result<()> {
         #[cfg(debug_assertions)]
-        if self.contains_filename(&filename)? {
+        if self.contains_filename(&filename, FileType::Tarball)? {
             panic!("inserting filename that already exists in OnyxStorage");
         }
+
+        file.seek(SeekFrom::Start(0))?;
+        let (refs_res, pack_res) = nrpm_tarball::extract_git_mock(file)?;
+        let mut refs_file = File::create(self.name_to_refs_path(&filename))?;
+        let mut pack_file = File::create(self.name_to_pack_path(&filename))?;
+        refs_file.write_all(refs_res.as_bytes())?;
+        pack_file.write_all(&pack_res)?;
+
         let to_path = self.name_to_path(&filename);
 
         file.seek(SeekFrom::Start(0))?;
@@ -62,8 +101,12 @@ impl OnyxStorage {
         Ok(())
     }
 
-    pub fn contains_filename(&self, filename: &str) -> Result<bool> {
-        let path = self.name_to_path(filename);
+    pub fn contains_filename(&self, filename: &str, file_type: FileType) -> Result<bool> {
+        let path = match file_type {
+            FileType::GitRefs => self.name_to_refs_path(filename),
+            FileType::GitPack => self.name_to_pack_path(filename),
+            FileType::Tarball => self.name_to_path(filename),
+        };
         Ok(fs::exists(path)?)
     }
 }
