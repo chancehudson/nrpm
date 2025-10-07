@@ -57,9 +57,7 @@ impl OnyxStorage {
         file.seek(SeekFrom::Start(0))?;
         let mut bytes = vec![];
         file.read_to_end(&mut bytes)?;
-        println!("adfjkafd {:?}", to_path);
         let mut to_file = File::create(to_path)?;
-        println!("b2");
         to_file.write_all(&mut bytes)?;
         Ok(())
     }

@@ -76,7 +76,7 @@ async fn attempt_auth() -> Result<LoginResponse> {
     let url = "http://localhost:8080";
     #[cfg(not(debug_assertions))]
     let url = "https://nrpm.io";
-    let url = format!("{url}/propose_token?token={proposed_token}");
+    let url = format!("{url}/v0/propose_token?token={proposed_token}");
     println!("    {url}");
     open::that(url)?;
 

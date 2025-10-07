@@ -15,6 +15,7 @@ use onyx_api::prelude::*;
 mod auth;
 mod download;
 mod error;
+mod git;
 mod list_packages;
 mod publish;
 #[cfg(test)]
@@ -72,16 +73,22 @@ fn build_server(state: OnyxState) -> axum::Router {
         .allow_headers(Any);
     Router::new()
         .route("/", get(root))
-        .route("/packages", get(list_packages::list_packages))
+        .route("/v0/packages", get(list_packages::list_packages))
         .route(
-            "/publish",
+            "/v0/publish",
             post(publish::publish).layer(DefaultBodyLimit::max(MAX_UPLOAD_SIZE)),
         )
-        .route("/signup", post(auth::signup))
-        .route("/login", post(auth::login))
-        .route("/auth", post(user::current_auth))
-        .route("/propose_token", post(user::propose_token))
-        .route("/version/{id}", get(download::download_package))
+        .route("/v0/signup", post(auth::signup))
+        .route("/v0/login", post(auth::login))
+        .route("/v0/auth", post(user::current_auth))
+        .route("/v0/propose_token", post(user::propose_token))
+        .route("/v0/version/{id}", get(download::download_package))
+        // mocked retrieval for packages
+        .route("/{package_name}/info/refs", get(git::mocked_refs))
+        .route(
+            "/{package_name}/git-upload-pack",
+            post(git::mocked_upload_pack),
+        )
         .with_state(state)
         .layer(cors)
 }

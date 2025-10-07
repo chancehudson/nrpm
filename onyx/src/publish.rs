@@ -258,7 +258,7 @@ mod tests {
             );
 
         let response = reqwest::Client::new()
-            .post(format!("{}/publish", test.url))
+            .post(format!("{}/v0/publish", test.url))
             .multipart(form)
             .send()
             .await?;
@@ -287,7 +287,7 @@ mod tests {
                 multipart::Part::bytes(bincode::serialize(&publish_data)?),
             );
             let response = client
-                .post(format!("{}/publish", test.url))
+                .post(format!("{}/v0/publish", test.url))
                 .multipart(form)
                 .send()
                 .await?;
@@ -306,7 +306,7 @@ mod tests {
                     .mime_str("application/tar")?,
             );
             let response = client
-                .post(format!("{}/publish", test.url))
+                .post(format!("{}/v0/publish", test.url))
                 .multipart(form)
                 .send()
                 .await?;
@@ -325,7 +325,7 @@ mod tests {
                     .mime_str("application/tar")?,
             );
             let response = client
-                .post(format!("{}/publish", test.url))
+                .post(format!("{}/v0/publish", test.url))
                 .multipart(form)
                 .send()
                 .await?;

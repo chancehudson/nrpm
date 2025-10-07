@@ -25,12 +25,12 @@ impl OnyxApi {
     }
 
     pub fn version_download_url(&self, id: HashId) -> String {
-        format!("{}/version/{}", self.url, id.to_string())
+        format!("{}/v0/version/{}", self.url, id.to_string())
     }
 
     pub async fn load_packages(&self) -> Result<Vec<(PackageModel, PackageVersionModel)>> {
         let response = reqwest::Client::new()
-            .get(format!("{}/packages", self.url))
+            .get(format!("{}/v0/packages", self.url))
             .send()
             .await?;
         if response.status().is_success() {
@@ -43,7 +43,7 @@ impl OnyxApi {
 
     pub async fn auth(&self, token: String) -> Result<LoginResponse> {
         let response = reqwest::Client::new()
-            .post(format!("{}/auth", self.url))
+            .post(format!("{}/v0/auth", self.url))
             .json(&TokenOnly { token })
             .send()
             .await?;
@@ -57,7 +57,7 @@ impl OnyxApi {
 
     pub async fn propose_token(&self, proposed_token: String, token: String) -> Result<()> {
         let response = reqwest::Client::new()
-            .post(format!("{}/propose_token", self.url))
+            .post(format!("{}/v0/propose_token", self.url))
             .json(&ProposeToken {
                 token,
                 proposed_token,
@@ -75,7 +75,7 @@ impl OnyxApi {
     /// the `UserModel` and the password.
     pub async fn signup(&self, request: LoginRequest) -> Result<LoginResponse> {
         let response = reqwest::Client::new()
-            .post(format!("{}/signup", self.url))
+            .post(format!("{}/v0/signup", self.url))
             .json(&request)
             .send()
             .await?;
@@ -93,7 +93,7 @@ impl OnyxApi {
 
     pub async fn login(&self, request: LoginRequest) -> Result<LoginResponse> {
         let response = reqwest::Client::new()
-            .post(format!("{}/login", self.url))
+            .post(format!("{}/v0/login", self.url))
             .json(&json!(request))
             .send()
             .await?;
@@ -123,7 +123,7 @@ impl OnyxApi {
                 multipart::Part::bytes(bincode::serialize(&request)?),
             );
         let response = reqwest::Client::new()
-            .post(format!("{}/publish", self.url))
+            .post(format!("{}/v0/publish", self.url))
             .multipart(form)
             .send()
             .await?;
