@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io;
+use std::io::Read;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -13,6 +14,7 @@ use std::fs;
 use tempfile::tempfile;
 use tokio;
 
+mod install;
 mod publish;
 
 #[tokio::main]
@@ -34,9 +36,9 @@ async fn main() -> Result<()> {
 async fn run() -> Result<()> {
     let matches = cli().get_matches();
     let api = OnyxApi::default();
+    let cwd = std::env::current_dir()?;
     // let login = LoginResponse { user: (), token: (), expires_at: () }
     if let Some(matches) = matches.subcommand_matches("publish") {
-        let cwd = std::env::current_dir()?;
         let path = matches
             .get_one::<String>("path")
             .map(|p| {
@@ -65,6 +67,19 @@ async fn run() -> Result<()> {
             let login = attempt_auth().await?;
             publish::upload_tarball(login, &api, &mut tarball).await?;
         }
+    } else if let Some(matches) = matches.subcommand_matches("install") {
+        let path = matches
+            .get_one::<String>("path")
+            .map(|p| {
+                let in_path = PathBuf::from(p);
+                if in_path.is_relative() {
+                    cwd.join(in_path)
+                } else {
+                    in_path
+                }
+            })
+            .unwrap_or(cwd);
+        install::install(&api, path).await?;
     }
     Ok(())
 }
@@ -118,5 +133,10 @@ fn cli() -> Command {
                         .value_name("path")
                         .action(ArgAction::Set).help("Generate a package tarball and save it to local file instead of uploading to registry"),
                 ).arg(Arg::new("path").short('p').long("path").value_name("path").action(ArgAction::Set).help("Publish a package from a custom path"))
+        )
+        .subcommand(
+            Command::new("install")
+                .about("install dependencies for a local project")
+                .arg(Arg::new("path").short('p').long("path").value_name("path").action(ArgAction::Set).help("Install dependencies for a package at a path"))
         )
 }

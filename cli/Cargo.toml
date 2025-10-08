@@ -25,3 +25,4 @@ onyx_api = { workspace = true, features = ["publish"] }
 clap = "4.5.40"
 dialoguer = "0.11.0"
 open = "5.3.2"
+toml = { version = "0.9.7", features = ["serde"] }

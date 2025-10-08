@@ -29,7 +29,6 @@ pub async fn mocked_refs(
                 ptk_bytes("ls-refs=unborn\n"),
                 ptk_bytes("ls-refs=symrefs\n"),
                 ptk_bytes("fetch=shallow\n"),
-                ptk_bytes("fetch=shallow\n"),
                 "0000".into(),
             ]
             .concat()
