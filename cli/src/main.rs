@@ -52,23 +52,10 @@ async fn run() -> Result<()> {
                 }
             })
             .unwrap_or(cwd);
-        println!("📦 Packaging {:?}", path);
-        if let Ok(metadata) = fs::metadata(&path) {
-            if !metadata.is_dir() {
-                anyhow::bail!("Path is not a directory: {:?}", path);
-            }
-        } else {
-            anyhow::bail!("Unable to stat path: {:?}", path);
-        }
-        let mut tarball = nrpm_tarball::create(&path, tempfile()?)?;
-        if let Some(archive_path) = matches.get_one::<String>("archive") {
-            io::copy(&mut tarball, &mut File::create(archive_path)?)?;
-        } else {
-            println!("🔃 Redirecting to authorize");
-            tokio::time::sleep(Duration::from_millis(500)).await;
-            let login = attempt_auth().await?;
-            publish::upload_tarball(login, &api, &mut tarball).await?;
-        }
+        let archive_path = matches
+            .get_one::<String>("archive")
+            .and_then(|s| Some(PathBuf::from(s)));
+        publish::upload_tarball(&api, &path, archive_path).await?;
     } else if let Some(matches) = matches.subcommand_matches("install") {
         let path = matches
             .get_one::<String>("path")
