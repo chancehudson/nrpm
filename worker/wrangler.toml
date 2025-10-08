@@ -9,3 +9,4 @@ compatibility_date = "2025-09-15"
 [assets]
 directory = "../target/dx/web/release/web/public"
 binding = "ASSETS"
+not_found_handling = "single-page-application"
