@@ -15,6 +15,15 @@ use tar::Archive;
 use tar::EntryType;
 use tempfile::tempdir;
 
+/// Calculate a 4 byte hex prefix and prepend it to the string content, and
+/// turn it into bytes.
+///
+/// https://git-scm.com/docs/protocol-v2
+pub fn ptk_bytes(data: &str) -> Vec<u8> {
+    let len = data.len() + 4;
+    format!("{:04x}{}", len, data).into_bytes()
+}
+
 /// Take a tarball and create a git repository with a single commit containing the contents of the
 /// tarball. Take this repo and create a git-upload-pack file and a info/refs file suitable for mocking a
 /// response to `git clone`. Return these values.
@@ -25,7 +34,7 @@ use tempfile::tempdir;
 /// This function assumes the tarball is untrusted.
 ///
 /// Returns, `(refs, pack_bytes)`, both ready to be sent over the wire to a git client.
-pub fn extract_git_mock(tarball: &mut File) -> Result<(String, Vec<u8>)> {
+pub fn extract_git_mock(tarball: &mut File) -> Result<(Vec<u8>, Vec<u8>)> {
     // TODO: similar safety to nrpm_tarball::hash
     //
     let mut archive = Archive::new(tarball);
@@ -112,27 +121,18 @@ pub fn extract_git_mock(tarball: &mut File) -> Result<(String, Vec<u8>)> {
         entry?;
     }
 
-    fn pkt_line(data: &str) -> String {
-        let len = data.len() + 4;
-        format!("{:04x}{}", len, data)
-    }
-
-    let refs_response = format!(
-        "001e# service=git-upload-pack
-0000{}{}0000",
-        pkt_line(&format!(
-            "{} HEAD\0multi_ack_detailed thin-pack ofs-delta no-progress shallow symref=HEAD:refs/heads/main object-format=sha1\n",
+    let refs_response = vec![
+        ptk_bytes(&format!(
+            "{} HEAD symref-target:refs/heads/main\n",
             commit_id.to_hex().to_string()
         )),
-        pkt_line(&format!(
+        ptk_bytes(&format!(
             "{} refs/heads/main\n",
             &commit_id.to_hex().to_string()
         )),
-    );
+        "0000".into(),
+    ]
+    .concat();
 
-    let mut upload_pack_response = Vec::new();
-    upload_pack_response.extend_from_slice(b"0008NAK\n");
-    upload_pack_response.extend_from_slice(&pack_bytes);
-
-    Ok((refs_response, upload_pack_response))
+    Ok((refs_response, pack_bytes))
 }

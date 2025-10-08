@@ -88,7 +88,7 @@ impl OnyxStorage {
         let (refs_res, pack_res) = nrpm_tarball::extract_git_mock(file)?;
         let mut refs_file = File::create(self.name_to_refs_path(&filename))?;
         let mut pack_file = File::create(self.name_to_pack_path(&filename))?;
-        refs_file.write_all(refs_res.as_bytes())?;
+        refs_file.write_all(&refs_res)?;
         pack_file.write_all(&pack_res)?;
 
         let to_path = self.name_to_path(&filename);

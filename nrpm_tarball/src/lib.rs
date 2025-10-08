@@ -14,7 +14,7 @@ use tar::EntryType;
 
 mod git;
 
-pub use git::extract_git_mock;
+pub use git::*;
 
 /// Take a tar archive and calculate a content based hash. Each file is separately hashed
 /// by hashing each path component followed by contents. A final hash is created by combining
@@ -45,10 +45,9 @@ pub fn hash(tarball: &mut File) -> Result<blake3::Hash> {
                         _ => anyhow::bail!("Non-normal path component detected in tarball"),
                     }
                 }
-                let mut str = String::new();
-                entry.read_to_string(&mut str)?;
-                // println!("content: {}", str);
-                hasher.update_reader(str.as_bytes())?;
+                let mut bytes = Vec::default();
+                entry.read_to_end(&mut bytes)?;
+                hasher.update_reader(bytes.as_slice())?;
                 ordered_files.insert(path, hasher.finalize());
             }
             EntryType::Directory => {
