@@ -136,14 +136,19 @@ impl OnyxStorage {
 
     /// Ingest a tarball by performing sanity/safety checks, extracting to directory, and creating
     /// a mocked git response for Nargo compatibility.
-    pub fn ingest_tarball(&self, file: &mut File, filename: String) -> Result<()> {
+    pub fn ingest_tarball(
+        &self,
+        file: &mut File,
+        filename: String,
+        version_name: &str,
+    ) -> Result<()> {
         #[cfg(debug_assertions)]
         if self.contains_filename(&filename, FileType::Tarball)? {
             panic!("inserting filename that already exists in OnyxStorage");
         }
 
         file.seek(SeekFrom::Start(0))?;
-        let (refs_res, pack_res) = nrpm_tarball::extract_git_mock(file)?;
+        let (refs_res, pack_res) = nrpm_tarball::extract_git_mock(file, version_name)?;
         let mut refs_file = File::create(self.name_to_refs_path(&filename))?;
         let mut pack_file = File::create(self.name_to_pack_path(&filename))?;
         refs_file.write_all(&refs_res)?;

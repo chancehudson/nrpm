@@ -34,7 +34,7 @@ pub fn ptk_bytes(data: &str) -> Vec<u8> {
 /// This function assumes the tarball is untrusted.
 ///
 /// Returns, `(refs, pack_bytes)`, both ready to be sent over the wire to a git client.
-pub fn extract_git_mock(tarball: &mut File) -> Result<(Vec<u8>, Vec<u8>)> {
+pub fn extract_git_mock(tarball: &mut File, version_name: &str) -> Result<(Vec<u8>, Vec<u8>)> {
     // TODO: similar safety to nrpm_tarball::hash
     //
     let mut archive = Archive::new(tarball);
@@ -77,9 +77,9 @@ pub fn extract_git_mock(tarball: &mut File) -> Result<(Vec<u8>, Vec<u8>)> {
         Vec::<ObjectId>::default(),
     )?;
 
-    // create the main branch
+    // create the only branch
     repo.reference(
-        "refs/heads/main",
+        format!("refs/heads/{version_name}"),
         commit_id,
         gix::refs::transaction::PreviousValue::MustNotExist,
         "create main branch",
@@ -123,11 +123,11 @@ pub fn extract_git_mock(tarball: &mut File) -> Result<(Vec<u8>, Vec<u8>)> {
 
     let refs_response = vec![
         ptk_bytes(&format!(
-            "{} HEAD symref-target:refs/heads/main\n",
+            "{} HEAD symref-target:refs/heads/{version_name}\n",
             commit_id.to_hex().to_string()
         )),
         ptk_bytes(&format!(
-            "{} refs/heads/main\n",
+            "{} refs/heads/{version_name}\n",
             &commit_id.to_hex().to_string()
         )),
         "0000".into(),

@@ -135,10 +135,11 @@ pub async fn publish(
         if let Some(_) = version_table.get(&version_id)? {
             return Err(OnyxError::bad_request("Package with hash already exists"));
         } else {
-            if let Err(e) = state
-                .storage
-                .ingest_tarball(&mut tarball, HashId::from(actual_hash).to_string())
-            {
+            if let Err(e) = state.storage.ingest_tarball(
+                &mut tarball,
+                HashId::from(actual_hash).to_string(),
+                &package_version,
+            ) {
                 println!(
                     "WARNING: package already exists with hash: {} {}",
                     actual_hash.to_string(),
