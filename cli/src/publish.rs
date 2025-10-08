@@ -5,10 +5,13 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use anyhow::Context;
 use anyhow::Result;
 use dialoguer::Input;
 use onyx_api::prelude::*;
 use tempfile::tempfile;
+
+use crate::nargo::*;
 
 pub async fn upload_tarball(
     api: &OnyxApi,
@@ -23,6 +26,13 @@ pub async fn upload_tarball(
     } else {
         anyhow::bail!("Unable to stat path: {:?}", pkg_dir);
     }
+    let config =
+        NargoConfig::load(pkg_dir).with_context(|| "Nargo.toml not found in directory!")?;
+    let version_name = config.package.version.ok_or(anyhow::anyhow!(
+        "no version field in Nargo.toml package section"
+    ))?;
+    let package_name = config.package.name;
+
     let mut tarball = nrpm_tarball::create(pkg_dir, tempfile()?)?;
     if let Some(path) = archive_path {
         std::io::copy(&mut tarball, &mut File::create(path)?)?;
@@ -32,6 +42,17 @@ pub async fn upload_tarball(
     tokio::time::sleep(Duration::from_millis(500)).await;
     let login = super::attempt_auth().await?;
 
+    println!(""); // line break
+    if !dialoguer::Confirm::new()
+        .with_prompt(format!(
+            "Publishing \"{package_name}\" version \"{version_name}\", are you sure?"
+        ))
+        .interact()?
+    {
+        println!("User cancelled the action");
+        return Ok(());
+    }
+
     let hash = nrpm_tarball::hash(&mut tarball)?;
     // reset the file handle for copying to final destination
     tarball.seek(std::io::SeekFrom::Start(0))?;
@@ -39,10 +60,6 @@ pub async fn upload_tarball(
     tarball.read_to_end(&mut tarball_bytes)?;
     println!("Uploading: {} bytes", tarball_bytes.len());
     println!("Hash: {}", hash.to_string());
-
-    let package_name: String = Input::new().with_prompt("Package name").interact_text()?;
-    let version_name: String = Input::new().with_prompt("Version name").interact_text()?;
-
     match api
         .publish(
             PublishData {
