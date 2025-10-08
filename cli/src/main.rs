@@ -16,7 +16,6 @@ use tokio;
 
 mod install;
 mod lockfile;
-mod nargo;
 mod publish;
 
 #[tokio::main]

@@ -1,0 +1,14 @@
+[package]
+name = "nargo_parse"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "Parse Nargo.toml files"
+
+[dependencies]
+anyhow = { workspace = true }
+reqwest = { workspace = true }
+semver.workspace = true
+serde = { workspace = true }
+
+toml = { version = "0.9.7", features = ["serde"] }

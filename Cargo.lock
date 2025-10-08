@@ -1152,7 +1152,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3122,6 +3122,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "nargo_parse"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "reqwest",
+ "semver",
+ "serde",
+ "toml",
+]
+
+[[package]]
 name = "native-tls"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3149,6 +3160,7 @@ dependencies = [
  "dirs",
  "indicatif",
  "nanoid",
+ "nargo_parse",
  "nrpm_tarball",
  "onyx_api",
  "open",
@@ -3248,11 +3260,13 @@ dependencies = [
  "blake3",
  "hex",
  "nanoid",
+ "nargo_parse",
  "nrpm_tarball",
  "redb",
  "reqwest",
  "serde",
  "serde_json",
+ "tar",
  "tokio",
 ]
 
@@ -3800,6 +3814,12 @@ dependencies = [
  "core-foundation-sys",
  "libc",
 ]
+
+[[package]]
+name = "semver"
+version = "1.0.27"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d767eb0aabc880b29956c35734170f26ed551a859dbd361d140cdbeca61ab1e2"
 
 [[package]]
 name = "send_wrapper"

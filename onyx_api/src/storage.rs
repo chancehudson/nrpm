@@ -5,10 +5,15 @@ use std::io::Read;
 use std::io::Seek;
 use std::io::SeekFrom;
 use std::io::Write;
+use std::path::Component;
 use std::path::PathBuf;
 
 use anyhow::Result;
 use nanoid::nanoid;
+use tar::Archive;
+use tar::EntryType;
+
+use nargo_parse::*;
 
 /// A structure that assumes it's the only reader/writer for a directory
 #[derive(Clone, Debug)]
@@ -74,6 +79,59 @@ impl OnyxStorage {
             FileType::Tarball => self.name_to_path(filename),
         };
         Ok(tokio::fs::File::open(read_path).await?)
+    }
+
+    /// Take a tarball and look through it to make sure it's safe-ish, and contains a valid
+    /// Nargo.toml
+    ///
+    /// Extract metadata from the Nargo.toml and return it.
+    pub fn validate_tarball(&self, file: &mut File) -> Result<(String, String)> {
+        file.seek(SeekFrom::Start(0))?;
+        let mut archive = Archive::new(file);
+
+        let mut nargo_toml_bytes = None;
+        for entry in archive.entries()? {
+            let mut entry = entry?;
+            let path = entry.path()?.to_path_buf();
+            if path.is_absolute() {
+                anyhow::bail!("absolute paths are disallowed in tarballs!");
+            }
+            for component in path.components() {
+                match component {
+                    Component::Normal(_) => {}
+                    _ => {
+                        anyhow::bail!("only normal path components are allowed in tarball entries!")
+                    }
+                }
+            }
+            match entry.header().entry_type() {
+                EntryType::Regular => {
+                    // TODO: safety checks here
+                    if path == PathBuf::from("Nargo.toml") {
+                        let mut bytes = Vec::default();
+                        entry.read_to_end(&mut bytes)?;
+                        nargo_toml_bytes = Some(bytes.clone());
+                    }
+                }
+                EntryType::Directory => {
+                    continue;
+                }
+                _ => anyhow::bail!(
+                    "Irregular entry detected in tar archive. Only directories and files are allowed in package tarballs!"
+                ),
+            }
+        }
+        if nargo_toml_bytes.is_none() {
+            anyhow::bail!("Nargo.toml does not exist in package root!");
+        }
+        let nargo_toml_bytes = nargo_toml_bytes.unwrap();
+        let config = NargoConfig::from_str(&String::try_from(nargo_toml_bytes)?)?;
+        config.validate_metadata()?;
+
+        Ok((
+            config.package.name,
+            config.package.version.unwrap_or_default(),
+        ))
     }
 
     /// Ingest a tarball by performing sanity/safety checks, extracting to directory, and creating

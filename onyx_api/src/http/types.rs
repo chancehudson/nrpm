@@ -19,8 +19,6 @@ pub struct ProposeToken {
 pub struct PublishData {
     pub hash: String,
     pub token: String,
-    pub package_name: String,
-    pub version_name: String,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]

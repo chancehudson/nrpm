@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 
-members = ["onyx", "onyx_api", "web", "cli", "nrpm_tarball"]
+members = ["onyx", "onyx_api", "web", "cli", "nrpm_tarball", "nargo_parse"]
 
 [workspace.dependencies]
 anyhow = "1.0.98"
@@ -17,6 +17,7 @@ nanoid = "0.4.0"
 bincode = { version = "1.0.0" }
 onyx_api = "0.2.0"
 nrpm_tarball = "0.1.0"
+semver = "1"
 
 [profile]
 

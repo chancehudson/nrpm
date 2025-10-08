@@ -6,7 +6,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use toml::Table;
 
-use crate::nargo::*;
+use nargo_parse::*;
 
 #[derive(Clone, Debug)]
 pub struct Lockfile {

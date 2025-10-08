@@ -7,11 +7,10 @@ use std::time::Duration;
 
 use anyhow::Context;
 use anyhow::Result;
-use dialoguer::Input;
 use onyx_api::prelude::*;
 use tempfile::tempfile;
 
-use crate::nargo::*;
+use nargo_parse::*;
 
 pub async fn upload_tarball(
     api: &OnyxApi,
@@ -28,6 +27,7 @@ pub async fn upload_tarball(
     }
     let config =
         NargoConfig::load(pkg_dir).with_context(|| "Nargo.toml not found in directory!")?;
+    config.validate_metadata()?;
     let version_name = config.package.version.ok_or(anyhow::anyhow!(
         "no version field in Nargo.toml package section"
     ))?;
@@ -45,7 +45,7 @@ pub async fn upload_tarball(
     println!(""); // line break
     if !dialoguer::Confirm::new()
         .with_prompt(format!(
-            "Publishing \"{package_name}\" version \"{version_name}\", are you sure?"
+            "Publish \"{package_name}\" version \"{version_name}\"?"
         ))
         .interact()?
     {
@@ -65,8 +65,6 @@ pub async fn upload_tarball(
             PublishData {
                 hash: hash.to_string(),
                 token: login.token,
-                package_name: package_name.clone(),
-                version_name: version_name.clone(),
             },
             tarball_bytes,
         )

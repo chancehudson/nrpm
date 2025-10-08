@@ -56,11 +56,30 @@ impl OnyxTest {
         })
     }
 
-    // Test helper to create a test tarball
     pub fn create_test_tarball(content: Option<&str>) -> Result<(Vec<u8>, blake3::Hash)> {
+        Self::create_test_tarball_named(content, None, None)
+    }
+
+    // Test helper to create a test tarball
+    pub fn create_test_tarball_named(
+        content: Option<&str>,
+        name: Option<&str>,
+        version: Option<&str>,
+    ) -> Result<(Vec<u8>, blake3::Hash)> {
         let content = content.unwrap_or("testcontents\n");
         let workdir = tempfile::TempDir::new()?;
         std::fs::write(workdir.path().join("aaaaa"), content)?;
+        std::fs::write(
+            workdir.path().join("Nargo.toml"),
+            format!(
+                "[package]
+name = \"{}\"
+version = \"{}\"
+",
+                name.unwrap_or(&nanoid!()),
+                version.unwrap_or("0.0.0")
+            ),
+        )?;
         let tar_file = tempfile()?;
         let mut tarball = nrpm_tarball::create(workdir.path(), tar_file)?;
         let mut tarball_clone = tarball.try_clone()?;
@@ -98,8 +117,6 @@ impl OnyxTest {
         let data = request.unwrap_or(PublishData {
             hash: tarball.1.to_string(),
             token: nanoid!(),
-            package_name: nanoid!(),
-            version_name: nanoid!(),
         });
         self.api.publish(data, tarball.0).await
     }

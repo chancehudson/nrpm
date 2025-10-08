@@ -5,6 +5,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 
+use anyhow::Context;
 use anyhow::Result;
 use reqwest::Url;
 use serde::Deserialize;
@@ -18,6 +19,10 @@ pub struct NargoConfig {
 }
 
 impl NargoConfig {
+    pub fn from_str(str: &str) -> Result<Self> {
+        Ok(toml::from_str::<Self>(str)?)
+    }
+
     /// Load a Nargo.toml and parse it into into a `NargoConfig`
     ///
     /// `path` may be either a `Nargo.toml` file, or a directory containing a `Nargo.toml` file.
@@ -32,7 +37,31 @@ impl NargoConfig {
         }
         let mut str = String::default();
         File::open(nargo_path)?.read_to_string(&mut str)?;
-        Ok(toml::from_str::<NargoConfig>(&str)?)
+        Self::from_str(&str)
+    }
+
+    /// Validates package metadata. Currently does semver validation for version field.
+    pub fn validate_metadata(&self) -> Result<()> {
+        semver::Version::parse(self.package.version.as_ref().ok_or(anyhow::anyhow!(
+            "version field is not present in package section"
+        ))?)
+        .with_context(|| "Failed to parse version as semver")?;
+        Ok(())
+    }
+
+    /// Check that all the dependencies in this `Nargo.toml` are configured correctly.
+    pub fn validate_dependencies(&self) -> Result<()> {
+        for (name, dep) in self.dependencies()? {
+            dep.valid_or_err().map_err(|e| {
+                anyhow::anyhow!(
+                    "in package {} dependency {} is misconfigured: {:?}",
+                    self.package.name,
+                    name,
+                    e
+                )
+            })?;
+        }
+        Ok(())
     }
 
     /// TODO: cache this. Potentially lots of extra parsing here.
@@ -51,21 +80,6 @@ impl NargoConfig {
             }
         }
         Ok(dependencies)
-    }
-
-    /// Check that all the dependencies in this `Nargo.toml` are configured correctly.
-    pub fn validate_dependencies(&self) -> Result<()> {
-        for (name, dep) in self.dependencies()? {
-            dep.valid_or_err().map_err(|e| {
-                anyhow::anyhow!(
-                    "in package {} dependency {} is misconfigured: {:?}",
-                    self.package.name,
-                    name,
-                    e
-                )
-            })?;
-        }
-        Ok(())
     }
 }
 

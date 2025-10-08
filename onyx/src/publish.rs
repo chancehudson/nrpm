@@ -77,6 +77,9 @@ pub async fn publish(
     let mut tarball = tempfile()?;
     tarball.write_all(&tarball_data)?;
 
+    // retrieve name and version from the contents of the tarball
+    let (package_name, package_version) = state.storage.validate_tarball(&mut tarball)?;
+
     let actual_hash = nrpm_tarball::hash(&mut tarball)?;
 
     if blake3::Hash::from_hex(publish_data.hash)? != actual_hash {
@@ -99,36 +102,35 @@ pub async fn publish(
         // generate a new version id for what is being published
         let version_id = HashId::from(actual_hash);
 
-        let package =
-            if let Some(package_id) = package_name_table.get(publish_data.package_name.as_str())? {
-                // the package name is already in use
-                // make sure we're the author of the package
-                let mut package = if let Some(package) = package_table.get(package_id.value())? {
-                    package.value()
-                } else {
-                    unreachable!("package tables are inconsistent")
-                };
-                if package.author_id != user_id {
-                    return Err(OnyxError::bad_request(
-                        "You are not authorized to publish versions of this package",
-                    ));
-                }
-                // we're publishing a new version of an existing package
-                package.latest_version_id = version_id.clone();
-                package_table.insert(package_id.value(), package.clone())?;
-                package
+        let package = if let Some(package_id) = package_name_table.get(package_name.as_str())? {
+            // the package name is already in use
+            // make sure we're the author of the package
+            let mut package = if let Some(package) = package_table.get(package_id.value())? {
+                package.value()
             } else {
-                // this is a completely new package
-                let package = PackageModel {
-                    id: nanoid!(),
-                    name: publish_data.package_name,
-                    author_id: user_id.clone(),
-                    latest_version_id: version_id.clone(),
-                };
-                package_table.insert(package.id.as_str(), package.clone())?;
-                package_name_table.insert(package.name.as_str(), package.id.as_str())?;
-                package
+                unreachable!("package tables are inconsistent")
             };
+            if package.author_id != user_id {
+                return Err(OnyxError::bad_request(
+                    "You are not authorized to publish versions of this package",
+                ));
+            }
+            // we're publishing a new version of an existing package
+            package.latest_version_id = version_id.clone();
+            package_table.insert(package_id.value(), package.clone())?;
+            package
+        } else {
+            // this is a completely new package
+            let package = PackageModel {
+                id: nanoid!(),
+                name: package_name,
+                author_id: user_id.clone(),
+                latest_version_id: version_id.clone(),
+            };
+            package_table.insert(package.id.as_str(), package.clone())?;
+            package_name_table.insert(package.name.as_str(), package.id.as_str())?;
+            package
+        };
 
         if let Some(_) = version_table.get(&version_id)? {
             return Err(OnyxError::bad_request("Package with hash already exists"));
@@ -150,17 +152,17 @@ pub async fn publish(
         }
 
         // make sure the version name is unique
-        if let Some(_) = package_version_name_table
-            .get((package.id.as_str(), publish_data.version_name.as_str()))?
+        if let Some(_) =
+            package_version_name_table.get((package.id.as_str(), package_version.as_str()))?
         {
             return Err(OnyxError::bad_request(&format!(
                 "Version already exists for package! version_name: {} package_name: {}",
-                publish_data.version_name, package.name
+                package_version, package.name
             )));
         }
 
         package_version_name_table.insert(
-            (package.id.as_str(), publish_data.version_name.as_str()),
+            (package.id.as_str(), package_version.as_str()),
             version_id.clone(),
         )?;
         package_version_table.insert(package.id.as_str(), version_id.clone())?;
@@ -168,7 +170,7 @@ pub async fn publish(
             version_id.clone(),
             PackageVersionModel {
                 id: version_id,
-                name: publish_data.version_name,
+                name: package_version,
                 author_id: user_id,
                 package_id: package.id.clone(),
                 created_at: timestamp(),
@@ -348,20 +350,13 @@ mod tests {
         let (login, _password) = test.signup(None).await?;
         let tarball = OnyxTest::create_test_tarball(None)?;
 
-        let package_name = nanoid!();
-
         let data = PublishData {
             hash: tarball.1.to_string(),
             token: login.token,
-            package_name,
-            version_name: nanoid!(),
         };
 
         let PublishResponse { package_id: _ } =
             test.publish(Some(data.clone()), tarball.clone()).await?;
-
-        let mut data = data;
-        data.version_name = nanoid!();
 
         let e = test.publish(Some(data), tarball).await.unwrap_err();
         println!("{e}");
@@ -377,19 +372,19 @@ mod tests {
         let test = OnyxTest::new().await?;
         let (login1, _password) = test.signup(None).await?;
         let (login2, _password) = test.signup(None).await?;
-        let tarball = OnyxTest::create_test_tarball(Some("content1"))?;
+        let tarball =
+            OnyxTest::create_test_tarball_named(Some("content1"), Some("test"), Some("0.0.0"))?;
 
         let data = PublishData {
             hash: tarball.1.to_string(),
             token: login1.token,
-            package_name: nanoid!(),
-            version_name: nanoid!(),
         };
 
         let PublishResponse { package_id: _ } =
             test.publish(Some(data.clone()), tarball.clone()).await?;
 
-        let tarball = OnyxTest::create_test_tarball(Some("content2"))?;
+        let tarball =
+            OnyxTest::create_test_tarball_named(Some("content2"), Some("test"), Some("0.0.1"))?;
 
         let mut data = data;
         data.token = login2.token;
@@ -413,8 +408,6 @@ mod tests {
         let data = PublishData {
             hash: tarball2.1.to_string(),
             token: login.token,
-            package_name: nanoid!(),
-            version_name: nanoid!(),
         };
 
         let e = test.publish(Some(data), tarball).await.unwrap_err();
@@ -426,24 +419,20 @@ mod tests {
     async fn fail_publish_duplicate_version_name() -> Result<()> {
         let test = OnyxTest::new().await?;
         let (login, _password) = test.signup(None).await?;
-        let tarball = OnyxTest::create_test_tarball(Some("content1"))?;
+        let tarball =
+            OnyxTest::create_test_tarball_named(Some("content1"), Some("test"), Some("0.0.0"))?;
 
-        let version_name = nanoid!();
-        let package_name = nanoid!();
         let data = PublishData {
             hash: tarball.1.to_string(),
             token: login.token.clone(),
-            package_name: package_name.clone(),
-            version_name: version_name.clone(),
         };
         let PublishResponse { package_id: _ } = test.publish(Some(data), tarball).await?;
 
-        let tarball = OnyxTest::create_test_tarball(Some("content2"))?;
+        let tarball =
+            OnyxTest::create_test_tarball_named(Some("content2"), Some("test"), Some("0.0.0"))?;
         let data = PublishData {
             hash: tarball.1.to_string(),
             token: login.token,
-            package_name,
-            version_name,
         };
 
         let e = test.publish(Some(data), tarball).await.unwrap_err();
@@ -458,23 +447,20 @@ mod tests {
     async fn publish_package_and_new_version() -> Result<()> {
         let test = OnyxTest::new().await?;
         let (login, _password) = test.signup(None).await?;
-        let tarball = OnyxTest::create_test_tarball(Some("content1"))?;
+        let tarball =
+            OnyxTest::create_test_tarball_named(Some("content1"), Some("test"), Some("0.0.0"))?;
 
-        let package_name = nanoid!();
         let data = PublishData {
             hash: tarball.1.to_string(),
             token: login.token.clone(),
-            package_name: package_name.clone(),
-            version_name: nanoid!(),
         };
         let PublishResponse { package_id } = test.publish(Some(data), tarball).await?;
 
-        let tarball = OnyxTest::create_test_tarball(Some("content2"))?;
+        let tarball =
+            OnyxTest::create_test_tarball_named(Some("content2"), Some("test"), Some("0.0.1"))?;
         let data = PublishData {
             hash: tarball.1.to_string(),
             token: login.token,
-            package_name,
-            version_name: nanoid!(),
         };
 
         let r2 = test.publish(Some(data), tarball).await?;

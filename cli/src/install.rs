@@ -4,10 +4,10 @@ use std::time::Duration;
 
 use anyhow::Result;
 use indicatif::ProgressStyle;
+use nargo_parse::*;
 use onyx_api::prelude::*;
 
 use crate::lockfile::Lockfile;
-use crate::nargo::*;
 
 /// A command to read a Nargo.toml file and retrieve all direct and indirect dependencies.
 ///
