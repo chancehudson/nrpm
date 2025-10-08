@@ -16,6 +16,53 @@ mod git;
 
 pub use git::*;
 
+/// Do a content hash of a directory. This may differ from a tarball content hash based on
+/// gitignores in parent directories on different systems.
+pub fn hash_dir(path: &Path) -> Result<blake3::Hash> {
+    let mut ordered_files: BTreeMap<PathBuf, blake3::Hash> = BTreeMap::new();
+    let walker = WalkBuilder::new(&path)
+        .git_ignore(true)
+        .git_global(false)
+        .git_exclude(false)
+        .parents(false)
+        .hidden(false) // include hidden files
+        .filter_entry(|entry| {
+            // Exclude .git directories
+            !(entry.file_name() == ".git" && entry.file_type().map_or(false, |ft| ft.is_dir()))
+        })
+        .build();
+    for entry in walker {
+        let entry = entry?;
+        if entry.path().is_dir() {
+            continue;
+        }
+        if entry.path().is_symlink() {
+            anyhow::bail!("symlinks are not allowed in nrpm hashes");
+        }
+        let mut hasher = blake3::Hasher::new();
+        // only hash the filepath and the contents
+        let rel_path = entry.path().strip_prefix(path)?;
+        for component in rel_path.components() {
+            match component {
+                Component::Normal(component) => {
+                    // println!("{}", component.to_string_lossy());
+                    hasher.update(component.as_encoded_bytes());
+                }
+                _ => anyhow::bail!("Non-normal path component detected in tarball"),
+            }
+        }
+        let bytes = std::fs::read(entry.path())?;
+        hasher.update_reader(bytes.as_slice())?;
+        ordered_files.insert(rel_path.to_path_buf(), hasher.finalize());
+    }
+    let mut hasher = blake3::Hasher::new();
+    for (_file, hash) in ordered_files {
+        // println!("{:?}", file);
+        hasher.update(hash.as_bytes());
+    }
+    Ok(hasher.finalize())
+}
+
 /// Take a tar archive and calculate a content based hash. Each file is separately hashed
 /// by hashing each path component followed by contents. A final hash is created by combining
 /// all file hashes in lexicographic order of file paths.
@@ -85,9 +132,9 @@ pub fn create(path: &Path, tar_file: File) -> Result<File> {
     let mut archive = tar::Builder::new(tar_file);
     let walker = WalkBuilder::new(&path)
         .git_ignore(true)
-        .git_global(true)
-        .git_exclude(true)
-        .parents(true)
+        .git_global(false)
+        .git_exclude(false)
+        .parents(false)
         .hidden(false) // include hidden files
         .filter_entry(|entry| {
             // Exclude .git directories
@@ -130,6 +177,34 @@ mod tests {
     use std::os::unix::fs::PermissionsExt;
 
     use super::*;
+
+    #[test]
+    fn hashes_should_match() -> Result<()> {
+        let tar_file = tempfile::tempfile()?;
+        let tempdir = tempfile::tempdir()?;
+
+        // so the gitignore is read
+        let git_dir = tempdir.path().join(".git");
+        fs::create_dir(&git_dir)?;
+
+        let gitignore = tempdir.path().join(".gitignore");
+        fs::write(gitignore, "ignored.txt")?;
+
+        let ignored_file = tempdir.path().join("ignored.txt");
+        fs::write(ignored_file, "test")?;
+
+        let test_file = tempdir.path().join("test.txt");
+        fs::write(test_file, "test")?;
+
+        let test_file = tempdir.path().join("test2.txt");
+        fs::write(test_file, "test2")?;
+
+        let mut tarball = create(tempdir.path(), tar_file)?;
+
+        assert_eq!(hash(&mut tarball)?, hash_dir(tempdir.path())?);
+
+        Ok(())
+    }
 
     #[test]
     fn should_return_start_of_tarball() -> Result<()> {
@@ -180,46 +255,6 @@ mod tests {
         assert!(found_files.contains(&"test.txt".into()));
         assert!(found_files.contains(&".gitignore".into()));
         assert!(!found_files.contains(&"ignored.txt".into()));
-
-        Ok(())
-    }
-
-    #[test]
-    fn should_use_parent_gitignore() -> Result<()> {
-        let tar_file = tempfile::tempfile()?;
-        let tempdir = tempfile::tempdir()?;
-
-        // we'll make a .gitignore at the root tempdir, then make a child directory that will be
-        // put in the tarball, which should respect the parent dir .gitignore
-        let content_dir = tempdir.path().join("contents");
-        fs::create_dir(&content_dir)?;
-
-        // so the gitignore is read
-        let git_dir = tempdir.path().join(".git");
-        fs::create_dir(&git_dir)?;
-
-        let gitignore = tempdir.path().join(".gitignore");
-        fs::write(gitignore, "ignored.txt")?;
-
-        let ignored_file = content_dir.join("ignored.txt");
-        fs::write(ignored_file, "test")?;
-
-        let test_file = content_dir.join("test.txt");
-        fs::write(test_file, "test")?;
-
-        let tarball = create(&content_dir, tar_file)?;
-
-        let mut archive = Archive::new(tarball);
-
-        let mut found_files = Vec::new();
-        for entry in archive.entries()? {
-            let entry = entry?;
-            let path = entry.path()?.to_path_buf();
-            found_files.push(path);
-        }
-
-        assert_eq!(found_files.len(), 1);
-        assert_eq!(found_files[0], PathBuf::from("test.txt"));
 
         Ok(())
     }

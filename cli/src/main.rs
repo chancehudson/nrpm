@@ -15,6 +15,7 @@ use tempfile::tempfile;
 use tokio;
 
 mod install;
+mod lockfile;
 mod publish;
 
 #[tokio::main]
