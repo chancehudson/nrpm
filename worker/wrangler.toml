@@ -1,0 +1,11 @@
+name = "nrpm-web"
+# main = "build/worker/shim.mjs"
+main = "index.mjs"
+compatibility_date = "2025-09-15"
+
+#[build]
+#command = "cargo install -q worker-build && worker-build --release"
+
+[assets]
+directory = "../target/dx/web/release/web/public"
+binding = "ASSETS"

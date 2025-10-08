@@ -1,0 +1,8 @@
+{
+  "version": 3,
+  "sources": ["../index.mjs"],
+  "sourceRoot": "dist",
+  "sourcesContent": ["export default {\n  async fetch(request, env) {\n    const url = new URL(request.url);\n\n      if (url.pathname.endsWith(\"/info/refs\")) {\n          return new Response(\"\", {\n              headers: { \"Location\": `https://api.nrpm.io${url.pathname}` },\n              statusCode: 308\n          });\n      }\n\n    return env.ASSETS.fetch(request);\n  },\n};\n"],
+  "mappings": ";AAAA,IAAO,gBAAQ;AAAA,EACb,MAAM,MAAM,SAAS,KAAK;AACxB,UAAM,MAAM,IAAI,IAAI,QAAQ,GAAG;AAE7B,QAAI,IAAI,SAAS,SAAS,YAAY,GAAG;AACrC,aAAO,IAAI,SAAS,IAAI;AAAA,QACpB,SAAS,EAAE,YAAY,sBAAsB,IAAI,QAAQ,GAAG;AAAA,QAC5D,YAAY;AAAA,MAChB,CAAC;AAAA,IACL;AAEF,WAAO,IAAI,OAAO,MAAM,OAAO;AAAA,EACjC;AACF;",
+  "names": []
+}
