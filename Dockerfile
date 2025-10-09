@@ -13,7 +13,7 @@ WORKDIR /app
 COPY . ./
 
 # Build the actual application
-RUN cargo build --bin=onyx --release
+RUN cargo build --bin=onyx #--release
 
 # Runtime stage
 FROM debian:bookworm-slim
@@ -28,10 +28,16 @@ WORKDIR /app
 RUN mkdir package_data
 
 # Copy binary from builder stage
-COPY --from=builder /app/target/release/onyx ./onyx
+#COPY --from=builder /app/target/release/onyx ./onyx
+COPY --from=builder /app/target/debug/onyx ./onyx
 
 # Expose port (adjust as needed)
 EXPOSE 3000
+
+ENV GIT_AUTHOR_NAME="onyx"
+ENV GIT_AUTHOR_EMAIL="onyx@nrpm.io"
+ENV GIT_COMMITTER_NAME="onyx"
+ENV GIT_COMMITTER_EMAIL="onyx@nrpm.io"
 
 # Run the server
 CMD ["./onyx"]

@@ -38,7 +38,7 @@ pub fn extract_git_mock(tarball: &mut File, version_name: &str) -> Result<(Vec<u
     // TODO: similar safety to nrpm_tarball::hash
     //
     let mut archive = Archive::new(tarball);
-    let git_dir = tempdir()?.keep();
+    let git_dir = tempdir()?;
 
     // TODO: make sure user git configurations aren't being read here or doing nasty things
     let repo = gix::init(&git_dir)?;
@@ -133,8 +133,6 @@ pub fn extract_git_mock(tarball: &mut File, version_name: &str) -> Result<(Vec<u
         "0000".into(),
     ]
     .concat();
-
-    std::fs::remove_dir_all(git_dir)?;
 
     Ok((refs_response, pack_bytes))
 }
