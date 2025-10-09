@@ -255,12 +255,14 @@ pub async fn install(path: PathBuf) -> Result<()> {
         &progress,
         indicatif::ProgressBar::new(0)
             .with_prefix(format!(
-                "👻 {} package{}, {} lockfile{}\n   wrote {}",
+                "👻 {} package{}, {} lockfile{}\n✅ wrote {}",
                 all_dependencies.len(),
                 if all_dependencies.len() == 1 { "" } else { "s" },
                 lockfile_count,
                 if lockfile_count == 1 { "" } else { "s" },
-                lockfile_path.display()
+                pathdiff::diff_paths(&lockfile_path, std::env::current_dir()?)
+                    .unwrap_or(lockfile_path)
+                    .display()
             ))
             .with_style(ProgressStyle::with_template("{prefix}")?)
             .with_finish(indicatif::ProgressFinish::Abandon),

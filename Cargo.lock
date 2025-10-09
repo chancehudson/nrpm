@@ -3190,6 +3190,7 @@ dependencies = [
  "nrpm_tarball",
  "onyx_api",
  "open",
+ "pathdiff",
  "reqwest",
  "serde",
  "tar",

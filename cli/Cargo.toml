@@ -32,3 +32,4 @@ open = "5.3.2"
 toml = { version = "0.9.7", features = ["serde"] }
 dirs = "6.0.0"
 indicatif = "0.18.0"
+pathdiff = "0.2.3"
