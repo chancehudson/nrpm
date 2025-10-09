@@ -23,7 +23,8 @@ nrpm_tarball = { workspace = true }
 axum = { version = "0.8.4", features = ["http2", "multipart"] }
 rand = "0.9.1"
 bcrypt = "0.17.0"
-tower-http = { version = "0.6.6", features = ["cors"] }
+tower-http = { version = "0.6.6", features = ["cors", "trace"] }
+regex = "1"
 
 tokio-util = "0.7.15"
 

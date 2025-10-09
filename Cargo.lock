@@ -3272,6 +3272,7 @@ dependencies = [
  "onyx_api",
  "rand 0.9.2",
  "redb",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
@@ -4479,6 +4480,7 @@ dependencies = [
  "tower",
  "tower-layer",
  "tower-service",
+ "tracing",
 ]
 
 [[package]]

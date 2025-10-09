@@ -31,7 +31,30 @@ impl PackageModel {
         }
     }
 
-    pub fn latest_version(db: Arc<Database>, name: &str) -> Result<Option<PackageVersionModel>> {
+    pub fn version(
+        db: Arc<Database>,
+        name: &str,
+        version_name: &str,
+    ) -> Result<Option<PackageVersionModel>> {
+        let read = db.begin_read()?;
+        let package_name_table = read.open_table(PACKAGE_NAME_TABLE)?;
+        let package_version_name_table = read.open_table(PACKAGE_VERSION_NAME_TABLE)?;
+        let version_table = read.open_table(VERSION_TABLE)?;
+        if let Some(package_id) = package_name_table.get(name)?
+            && let Some(version_id) =
+                package_version_name_table.get((package_id.value(), version_name))?
+            && let Some(version) = version_table.get(version_id.value())?
+        {
+            Ok(Some(version.value()))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn latest_version(
+        db: Arc<Database>,
+        name: &str,
+    ) -> Result<Option<(PackageModel, PackageVersionModel)>> {
         let read = db.begin_read()?;
         let package_table = read.open_table(PACKAGE_TABLE)?;
         let package_name_table = read.open_table(PACKAGE_NAME_TABLE)?;
@@ -40,7 +63,7 @@ impl PackageModel {
             && let Some(package) = package_table.get(package_id.value())?
             && let Some(version) = version_table.get(package.value().latest_version_id)?
         {
-            Ok(Some(version.value()))
+            Ok(Some((package.value(), version.value())))
         } else {
             Ok(None)
         }

@@ -63,6 +63,8 @@ fn create_tables(db: Arc<redb::Database>) -> Result<()> {
     write.open_table(PACKAGE_VERSION_NAME_TABLE)?;
     write.open_multimap_table(PACKAGE_VERSION_TABLE)?;
     write.open_table(VERSION_TABLE)?;
+    write.open_table(GIT_REFS_TABLE)?;
+    write.open_table(GIT_PACK_TABLE)?;
 
     write.commit()?;
     Ok(())

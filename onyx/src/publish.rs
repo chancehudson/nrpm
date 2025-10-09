@@ -5,6 +5,7 @@ use axum::extract::Multipart;
 use axum::extract::State;
 use axum::response::Json as ResponseJson;
 use nanoid::nanoid;
+use nrpm_tarball::ptk_str;
 use redb::ReadableTable;
 use tempfile::tempfile;
 
@@ -135,14 +136,47 @@ pub async fn publish(
             package
         };
 
+        // make sure the version name is unique
+        if let Some(_) =
+            package_version_name_table.get((package.id.as_str(), package_version.as_str()))?
+        {
+            return Err(OnyxError::bad_request(&format!(
+                "Version already exists for package! version_name: {} package_name: {}",
+                package_version, package.name
+            )));
+        }
+
+        let mut git_pack_table = write.open_table(GIT_PACK_TABLE)?;
+        let mut git_refs_table = write.open_table(GIT_REFS_TABLE)?;
+        let mut existing_refs = git_refs_table
+            .get(package.id.as_str())?
+            .and_then(|v| Some(v.value().to_string()))
+            .unwrap_or_default();
+
+        // take the tarball and build a git tree with a single commit containing the tarball
+        // contents
+        let (commit_hex, pack_bytes) =
+            nrpm_tarball::extract_git_mock(&mut tarball, &package_version).map_err(|e| {
+                OnyxError::bad_request(&format!("Failed to create git pack: {:?}", e))
+            })?;
+
+        existing_refs.push_str(&ptk_str(&format!(
+            "{} refs/heads/{}\n",
+            &commit_hex, package_version
+        )));
+
+        // we'll store all the refs for a package here
+        git_refs_table.insert(package.id.as_str(), existing_refs.as_str())?;
+        // and for each commit we'll store a ready to be sent pack
+        git_pack_table.insert(commit_hex.as_str(), pack_bytes)?;
+
         if let Some(_) = version_table.get(&version_id)? {
             return Err(OnyxError::bad_request("Package with hash already exists"));
         } else {
-            if let Err(e) = state.storage.ingest_tarball(
-                &mut tarball,
-                HashId::from(actual_hash).to_string(),
-                &package_version,
-            ) {
+            if let Err(e) = state
+                .storage
+                .ingest_tarball(&mut tarball, HashId::from(actual_hash).to_string())
+            {
                 log::warn!(
                     "package already exists with hash: {} {:?}",
                     actual_hash.to_string(),
@@ -153,16 +187,6 @@ pub async fn publish(
                     actual_hash.to_string()
                 )));
             }
-        }
-
-        // make sure the version name is unique
-        if let Some(_) =
-            package_version_name_table.get((package.id.as_str(), package_version.as_str()))?
-        {
-            return Err(OnyxError::bad_request(&format!(
-                "Version already exists for package! version_name: {} package_name: {}",
-                package_version, package.name
-            )));
         }
 
         package_version_name_table.insert(
@@ -348,7 +372,10 @@ mod tests {
         Ok(())
     }
 
+    // this test is impossible because we read the version from the Nargo.toml
+    // so a colliding package hash would require a blake3 collision
     #[tokio::test]
+    #[ignore]
     async fn fail_publish_duplicate_package_hash() -> Result<()> {
         let test = OnyxTest::new().await?;
         let (login, _password) = test.signup(None).await?;

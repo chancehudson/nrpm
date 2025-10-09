@@ -1,5 +1,7 @@
 use std::fs::File;
 use std::io::Read;
+use std::io::Seek;
+use std::io::SeekFrom;
 use std::sync::atomic::AtomicBool;
 
 use anyhow::Result;
@@ -20,8 +22,12 @@ use tempfile::tempdir;
 ///
 /// https://git-scm.com/docs/protocol-v2
 pub fn ptk_bytes(data: &str) -> Vec<u8> {
+    ptk_str(data).into_bytes()
+}
+
+pub fn ptk_str(data: &str) -> String {
     let len = data.len() + 4;
-    format!("{:04x}{}", len, data).into_bytes()
+    format!("{:04x}{}", len, data)
 }
 
 /// Take a tarball and create a git repository with a single commit containing the contents of the
@@ -33,10 +39,11 @@ pub fn ptk_bytes(data: &str) -> Vec<u8> {
 ///
 /// This function assumes the tarball is somewhat trusted (see onyx_api::storage::validate_tarball)
 ///
-/// Returns, `(refs, pack_bytes)`, both ready to be sent over the wire to a git client.
-pub fn extract_git_mock(tarball: &mut File, version_name: &str) -> Result<(Vec<u8>, Vec<u8>)> {
-    // TODO: similar safety to nrpm_tarball::hash
-    //
+/// Returns, `(commit_hash, pack_bytes)`. The pack_bytes are ready to be sent over the wire to a
+/// git client. The commit_hash is meant to be used in a dynamically constructed refs listing.
+pub fn extract_git_mock(tarball: &mut File, version_name: &str) -> Result<(String, Vec<u8>)> {
+    tarball.seek(SeekFrom::Start(0))?;
+
     let mut archive = Archive::new(tarball);
     let git_dir = tempdir()?;
 
@@ -47,7 +54,6 @@ pub fn extract_git_mock(tarball: &mut File, version_name: &str) -> Result<(Vec<u
         let mut entry = entry?;
         match entry.header().entry_type() {
             EntryType::Regular => {
-                // TODO: safety checks here
                 let path = entry.path()?.to_path_buf();
                 let mut bytes = Vec::default();
                 entry.read_to_end(&mut bytes)?;
@@ -121,18 +127,7 @@ pub fn extract_git_mock(tarball: &mut File, version_name: &str) -> Result<(Vec<u
         entry?;
     }
 
-    let refs_response = vec![
-        ptk_bytes(&format!(
-            "{} HEAD symref-target:refs/heads/{version_name}\n",
-            commit_id.to_hex().to_string()
-        )),
-        ptk_bytes(&format!(
-            "{} refs/heads/{version_name}\n",
-            &commit_id.to_hex().to_string()
-        )),
-        "0000".into(),
-    ]
-    .concat();
+    let commit_hex = commit_id.to_hex().to_string();
 
-    Ok((refs_response, pack_bytes))
+    Ok((commit_hex, pack_bytes))
 }

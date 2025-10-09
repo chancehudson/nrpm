@@ -22,12 +22,6 @@ pub struct OnyxStorage {
     pub storage_path: PathBuf,
 }
 
-pub enum FileType {
-    GitRefs,
-    GitPack,
-    Tarball,
-}
-
 impl Default for OnyxStorage {
     fn default() -> Self {
         let storage_path = temp_dir().join(nanoid!());
@@ -69,16 +63,8 @@ impl OnyxStorage {
     }
 
     /// Get a reader for filename in this storage
-    pub async fn reader_async(
-        &self,
-        filename: &str,
-        file_type: FileType,
-    ) -> Result<tokio::fs::File> {
-        let read_path = match file_type {
-            FileType::GitRefs => self.name_to_refs_path(filename),
-            FileType::GitPack => self.name_to_pack_path(filename),
-            FileType::Tarball => self.name_to_path(filename),
-        };
+    pub async fn reader_async(&self, filename: &str) -> Result<tokio::fs::File> {
+        let read_path = self.name_to_path(filename);
         Ok(tokio::fs::File::open(read_path).await?)
     }
 
@@ -90,7 +76,7 @@ impl OnyxStorage {
     /// Here we check that the contents of a tarball are of bounded size, and bounded number of
     /// entries. We check all path entries and disallow absolute paths, and paths referencing parent
     /// directories. We disallow all non-regular files. We disallow file paths that are non-utf8.
-    /// We disallow file paths that are empty.
+    /// We disallow file paths that are empty. We disallow `.git` directories.
     pub fn validate_tarball(&self, file: &mut File) -> Result<(String, String)> {
         file.seek(SeekFrom::Start(0))?;
         let mut archive = Archive::new(file);
@@ -122,6 +108,9 @@ impl OnyxStorage {
             }
             path.to_str()
                 .with_context(|| "tarball entry path contains non-unicode characters")?;
+            if path == PathBuf::from(".git") {
+                anyhow::bail!("tarball may not contain a .git entry");
+            }
             for component in path.components() {
                 match component {
                     Component::Normal(_) => {}
@@ -132,7 +121,6 @@ impl OnyxStorage {
             }
             match entry.header().entry_type() {
                 EntryType::Regular => {
-                    // TODO: safety checks here
                     if path == PathBuf::from("Nargo.toml") {
                         let mut bytes = Vec::default();
                         entry.read_to_end(&mut bytes)?;
@@ -165,26 +153,13 @@ impl OnyxStorage {
 
     /// Ingest a tarball by performing sanity/safety checks, extracting to directory, and creating
     /// a mocked git response for Nargo compatibility.
-    pub fn ingest_tarball(
-        &self,
-        file: &mut File,
-        filename: String,
-        version_name: &str,
-    ) -> Result<()> {
+    pub fn ingest_tarball(&self, file: &mut File, filename: String) -> Result<()> {
         #[cfg(debug_assertions)]
-        if self.contains_filename(&filename, FileType::Tarball)? {
+        if self.contains_filename(&filename)? {
             panic!("inserting filename that already exists in OnyxStorage");
         }
 
-        file.seek(SeekFrom::Start(0))?;
-        let (refs_res, pack_res) = nrpm_tarball::extract_git_mock(file, version_name)?;
-        let mut refs_file = File::create(self.name_to_refs_path(&filename))?;
-        let mut pack_file = File::create(self.name_to_pack_path(&filename))?;
-        refs_file.write_all(&refs_res)?;
-        pack_file.write_all(&pack_res)?;
-
         let to_path = self.name_to_path(&filename);
-
         file.seek(SeekFrom::Start(0))?;
         let mut bytes = vec![];
         file.read_to_end(&mut bytes)?;
@@ -193,12 +168,8 @@ impl OnyxStorage {
         Ok(())
     }
 
-    pub fn contains_filename(&self, filename: &str, file_type: FileType) -> Result<bool> {
-        let path = match file_type {
-            FileType::GitRefs => self.name_to_refs_path(filename),
-            FileType::GitPack => self.name_to_pack_path(filename),
-            FileType::Tarball => self.name_to_path(filename),
-        };
+    pub fn contains_filename(&self, filename: &str) -> Result<bool> {
+        let path = self.name_to_path(filename);
         Ok(fs::exists(path)?)
     }
 }

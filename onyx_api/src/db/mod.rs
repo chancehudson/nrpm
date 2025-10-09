@@ -42,6 +42,12 @@ pub mod tables {
         MultimapTableDefinition::new("package_versions");
     pub const VERSION_TABLE: TableDefinition<HashId, PackageVersionModel> =
         TableDefinition::new("versions");
+
+    // a list of the refs for each version of a package
+    // package_id keyed to refs in a single string
+    pub const GIT_REFS_TABLE: TableDefinition<NanoId, &str> = TableDefinition::new("git_refs");
+    // commit_id_hex keyed to pack bytes
+    pub const GIT_PACK_TABLE: TableDefinition<&str, Vec<u8>> = TableDefinition::new("git_packs");
 }
 
 #[cfg(feature = "server")]

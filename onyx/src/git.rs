@@ -1,12 +1,16 @@
+use std::sync::LazyLock;
+
 use anyhow::Result;
 use axum::body::Body;
 use axum::extract::Path;
 use axum::extract::State;
 use axum::response::Response;
 use nrpm_tarball::ptk_bytes;
+use onyx_api::db::GIT_PACK_TABLE;
+use onyx_api::db::GIT_REFS_TABLE;
 use onyx_api::db::PackageModel;
+use regex::Regex;
 use reqwest::StatusCode;
-use tokio::io::AsyncReadExt;
 
 use super::OnyxError;
 use super::OnyxState;
@@ -56,7 +60,7 @@ pub async fn mocked_upload_pack(
     Path(package_name): Path<String>,
     body: String,
 ) -> Result<Response, OnyxError> {
-    if let Some(version) = PackageModel::latest_version(state.db, &package_name)? {
+    if let Some(package) = PackageModel::package_by_name(state.db.clone(), &package_name)? {
         let mut res = Response::new(Body::empty());
         res.headers_mut().insert(
             "Content-Type",
@@ -65,34 +69,69 @@ pub async fn mocked_upload_pack(
         res.headers_mut()
             .insert("Cache-Control", "no-cache".parse().unwrap());
 
+        log::debug!("upload-pack: {}", body);
+
         if body.contains("0014command=ls-refs") {
-            let mut refs = state
-                .storage
-                .reader_async(
-                    &version.id.to_string(),
-                    onyx_api::prelude::FileType::GitRefs,
-                )
-                .await?;
-            let mut refs_bytes = Vec::default();
-            refs.read_to_end(&mut refs_bytes).await?;
-            *res.body_mut() = refs_bytes.into();
-        } else {
-            let mut pack = state
-                .storage
-                .reader_async(
-                    &version.id.to_string(),
-                    onyx_api::prelude::FileType::GitPack,
-                )
-                .await?;
+            let read = state.db.begin_read()?;
+            let git_refs_table = read.open_table(GIT_REFS_TABLE)?;
+            // a list of refs, we'll manually add a terminating sequence
+            let refs = git_refs_table
+                .get(package.id.as_str())?
+                .and_then(|v| Some(v.value().to_string()))
+                .unwrap_or_default();
+
+            *res.body_mut() = format!("{}0000", refs).into_bytes().into();
+        } else if body.contains("0011command=fetch") {
+            // parse what commit is being requested, then send the pack data for that commit
+            static COMMIT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+                Regex::new(r"0032want ([a-f0-9]{40})").expect("failed to create commit regex")
+            });
+            let commit_hex = if let Some(caps) = COMMIT_REGEX.captures(&body)
+                // first entry is full match, we want the subgroup
+                && caps.len() >= 2
+            {
+                caps[1].to_string()
+            } else {
+                return Err(OnyxError::bad_request("unable to find want commits"));
+            };
+
+            let read = state.db.begin_read()?;
+            let git_packs_table = read.open_table(GIT_PACK_TABLE)?;
+            let pack_bytes = if let Some(pack) = git_packs_table.get(commit_hex.as_str())? {
+                pack.value()
+            } else {
+                return Err(OnyxError::bad_request(&format!(
+                    "unable to find pack for commit {}",
+                    commit_hex
+                )));
+            };
+
+            // determine the name of the ref for the download message
+            // TODO: consider storing this in the db
+            let git_refs_table = read.open_table(GIT_REFS_TABLE)?;
+            // a list of refs, we'll manually add a terminating sequence
+            let refs = git_refs_table
+                .get(package.id.as_str())?
+                .and_then(|v| Some(v.value().to_string()))
+                .unwrap_or_default();
+
+            let ref_regex = Regex::new(&format!("{} refs/heads/(.*)", commit_hex))
+                .expect("failed to build ref_regex");
+            let version_name = if let Some(caps) = ref_regex.captures(&refs)
+                && caps.len() >= 2
+            {
+                caps[1].to_string()
+            } else {
+                "unknown_version".to_string()
+            };
+
             let mut res_bytes = vec![
                 ptk_bytes("packfile\n"),
                 ptk_bytes(&format!(
                     "\x02🚒 nrpm downloading {}@{}\n",
-                    package_name, version.name
+                    package_name, version_name
                 )),
             ];
-            let mut pack_bytes = Vec::default();
-            pack.read_to_end(&mut pack_bytes).await?;
             for chunk in pack_bytes.chunks((pack_bytes.len() / (10 * 1024)).max(1)) {
                 // manually calculate the length prefixes
                 let bytes = ["\x01".as_bytes(), chunk].concat();
@@ -102,6 +141,8 @@ pub async fn mocked_upload_pack(
 
             res_bytes.push("0000".into());
             *res.body_mut() = res_bytes.concat().into();
+        } else {
+            return Err(OnyxError::bad_request("unknown git command"));
         }
 
         Ok(res)

@@ -15,30 +15,9 @@ pub async fn load_package_version(
     State(state): State<OnyxState>,
     Path(name): Path<String>,
 ) -> Result<ResponseJson<(PackageModel, PackageVersionModel)>, OnyxError> {
-    let read = state.db.begin_read()?;
-    let package_name_table = read.open_table(PACKAGE_NAME_TABLE)?;
-    let package_id = package_name_table
-        .get(name.as_str())?
-        .ok_or(OnyxError::bad_request(&format!(
-            "Unable to find package \"{}\"",
-            name,
-        )))?;
-    let package_table = read.open_table(PACKAGE_TABLE)?;
-    let package = package_table
-        .get(package_id.value())?
-        .ok_or(OnyxError::bad_request(&format!(
-            "Unable to find package for id \"{}\"",
-            package_id.value(),
-        )))?
-        .value();
-    let version_table = read.open_table(VERSION_TABLE)?;
-    let version = version_table
-        .get(&package.latest_version_id)?
-        .ok_or(OnyxError::bad_request(&format!(
-            "Unable to find version for id \"{}\"",
-            package.latest_version_id.to_string(),
-        )))?
-        .value();
+    let (package, version) = PackageModel::latest_version(state.db, &name)?.ok_or(
+        OnyxError::bad_request(&format!("Unable to resolve package \"{}\"", name)),
+    )?;
     Ok(ResponseJson((package, version)))
 }
 

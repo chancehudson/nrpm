@@ -18,9 +18,7 @@ pub struct PackageVersionModel {
 #[cfg(feature = "server")]
 impl PackageVersionModel {
     pub async fn reader_by_id(storage: OnyxStorage, version_id: HashId) -> Result<impl AsyncRead> {
-        storage
-            .reader_async(&version_id.to_string(), FileType::Tarball)
-            .await
+        storage.reader_async(&version_id.to_string()).await
     }
 }
 
