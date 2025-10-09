@@ -21,13 +21,21 @@ const REGISTRY_URL: &str = "https://nrpm.io";
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
+    log::debug!("registry url: {REGISTRY_URL}");
 
     if let Err(err) = run().await {
         eprintln!("❌ {}", err);
 
         // Print all errors in the chain
-        for (i, cause) in err.chain().enumerate().skip(1) {
-            eprintln!("  {}: {}", i, cause);
+        for (_i, cause) in err.chain().enumerate().skip(1) {
+            if cause.to_string().starts_with("ADVICE") {
+                eprintln!(
+                    "💡 {}",
+                    cause.to_string().trim_start_matches("ADVICE").trim()
+                );
+            } else {
+                eprintln!("   {}", cause);
+            }
         }
 
         std::process::exit(1);
@@ -40,7 +48,6 @@ async fn run() -> Result<()> {
     let matches = cli().get_matches();
     let api = OnyxApi::default();
     let cwd = std::env::current_dir()?;
-    // let login = LoginResponse { user: (), token: (), expires_at: () }
     if let Some(matches) = matches.subcommand_matches("publish") {
         let path = matches
             .get_one::<String>("path")
@@ -56,6 +63,7 @@ async fn run() -> Result<()> {
         let archive_path = matches
             .get_one::<String>("archive")
             .and_then(|s| Some(PathBuf::from(s)));
+        install::install(path.to_path_buf()).await?;
         publish::upload_tarball(&api, &path, archive_path).await?;
     } else if let Some(matches) = matches.subcommand_matches("install") {
         let path = matches
@@ -69,7 +77,7 @@ async fn run() -> Result<()> {
                 }
             })
             .unwrap_or(cwd);
-        install::install(&api, path).await?;
+        install::install(path).await?;
     }
     Ok(())
 }

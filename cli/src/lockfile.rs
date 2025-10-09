@@ -72,6 +72,10 @@ impl Lockfile {
         self.packages_cache.values()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.packages_cache.is_empty()
+    }
+
     /// Retrieve a lockfile entry, if it exists.
     pub fn entry(&self, identifier: &str) -> Option<LockEntry> {
         self.packages_cache

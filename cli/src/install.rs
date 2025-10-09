@@ -5,8 +5,8 @@ use std::time::Duration;
 use anyhow::Context;
 use anyhow::Result;
 use indicatif::ProgressStyle;
+use nanoid::nanoid;
 use nargo_parse::*;
-use onyx_api::prelude::*;
 
 use crate::lockfile::Lockfile;
 
@@ -17,7 +17,7 @@ use crate::lockfile::Lockfile;
 /// 1. Git URL. This requires cloning the repository at a specific tag.
 /// 2. Package name. This will load the package from the nrpm registry.
 /// 3. Local path. Read the contents of a directory on the local machine.
-pub async fn install(_api: &OnyxApi, path: PathBuf) -> Result<()> {
+pub async fn install(path: PathBuf) -> Result<()> {
     // Match the nargo default path.
     // TODO: make this more configurable
     //
@@ -55,7 +55,7 @@ pub async fn install(_api: &OnyxApi, path: PathBuf) -> Result<()> {
     multiprogress.insert_before(
         &progress,
         indicatif::ProgressBar::new(0)
-            .with_prefix("⬇️  Downloading dependencies...")
+            .with_prefix("🌨️  Downloading dependencies...")
             .with_style(ProgressStyle::with_template("{prefix}")?)
             .with_finish(indicatif::ProgressFinish::Abandon),
     );
@@ -148,7 +148,7 @@ pub async fn install(_api: &OnyxApi, path: PathBuf) -> Result<()> {
     multiprogress.insert_before(
         &progress,
         indicatif::ProgressBar::new(0)
-            .with_prefix("🧮 Checking integrity...")
+            .with_prefix("✨ Checking integrity...")
             .with_style(ProgressStyle::with_template("{prefix}")?)
             .with_finish(indicatif::ProgressFinish::Abandon),
     );
@@ -163,7 +163,11 @@ pub async fn install(_api: &OnyxApi, path: PathBuf) -> Result<()> {
     }
     progress.set_message("checking dependent lockfiles");
     // check the lockfiles of all our dependencies
-    for (_identifier, lockfile) in all_lockfiles {
+    for (identifier, lockfile) in &all_lockfiles {
+        // the dependency whose lockfile we're checking
+        let (dep_path, dep) = all_dependencies
+            .get(identifier)
+            .ok_or(anyhow::anyhow!("dependency not known {identifier}"))?;
         for entry in lockfile.entries() {
             let entry_identifier = entry.identifier();
             let hash = hashes.get(&entry_identifier).ok_or(anyhow::anyhow!(
@@ -171,13 +175,33 @@ pub async fn install(_api: &OnyxApi, path: PathBuf) -> Result<()> {
                 entry_identifier
             ))?;
             if hash != &entry.blake3 {
-                let (_, dep) = all_dependencies
-                    .get(&entry_identifier)
-                    .ok_or(anyhow::anyhow!(
-                        "dependency was not enumerated {}",
-                        entry.git
-                    ))?;
-                anyhow::bail!("hash mismatch for package {}!", dep.name);
+                // the dependency of the dependency we're checking
+                let (inner_dep_path, inner_dep) =
+                    all_dependencies
+                        .get(&entry_identifier)
+                        .ok_or(anyhow::anyhow!(
+                            "dependency was not enumerated {}",
+                            entry.git
+                        ))?;
+                Err(anyhow::anyhow!("ADVICE Consider deleting local copies and re-downloading. If this error persists contact the authors of \"{}\" and \"{}\".", dep.name, inner_dep.name)
+                    .context("integrity check failed, halting")
+                    .context(format!("\"{}\" exists at path: {dep_path:?}", dep.name))
+                    .context(format!(
+                        "\"{}\" exists at path: {inner_dep_path:?}",
+                        inner_dep.name
+                    ))
+                    .context(format!(
+                        "our local \"{}\" has hash: {}",
+                        inner_dep.name, hash
+                    ))
+                    .context(format!(
+                        "\"{}\" depends on \"{}\" with hash: {}",
+                        dep.name, inner_dep.name, entry.blake3
+                    ))
+                    .context(format!(
+                        "lockfile integrity check failed for dependency: \"{}\"",
+                        dep.name
+                    )))?;
             }
         }
     }
@@ -204,7 +228,15 @@ pub async fn install(_api: &OnyxApi, path: PathBuf) -> Result<()> {
                 entry_identifier
             ))?;
             if hash != &entry.blake3 {
-                anyhow::bail!("hash mismatch for dependent {}", dep.name);
+                Err(anyhow::anyhow!("ADVICE Consider deleting local copy and re-downloading. If this error persists contact the author of \"{}\".", dep.name)
+                    .context("integrity check failed, halting")
+                    .context(format!("computed hash: {}", hash))
+                    .context(format!("expected hash: {}", entry.blake3))
+                    .context(format!("dependent location: {:?}", dep_path))
+                    .context(format!(
+                        "hash mismatch for dependent package: \"{}\"\n",
+                        dep.name
+                    )))?;
             }
         } else {
             // add an entry
@@ -212,10 +244,24 @@ pub async fn install(_api: &OnyxApi, path: PathBuf) -> Result<()> {
         }
     }
     lockfile.save(&lockfile_path)?;
+    // for proper lockfile number reporting
+    all_lockfiles.insert(nanoid!(), lockfile);
+    let lockfile_count = all_lockfiles
+        .iter()
+        .filter(|(_k, v)| !v.is_empty())
+        .collect::<Vec<_>>()
+        .len();
     multiprogress.insert_before(
         &progress,
         indicatif::ProgressBar::new(0)
-            .with_prefix("🟩 Done!")
+            .with_prefix(format!(
+                "👻 {} package{}, {} lockfile{}\n   wrote {}",
+                all_dependencies.len(),
+                if all_dependencies.len() == 1 { "" } else { "s" },
+                lockfile_count,
+                if lockfile_count == 1 { "" } else { "s" },
+                lockfile_path.display()
+            ))
             .with_style(ProgressStyle::with_template("{prefix}")?)
             .with_finish(indicatif::ProgressFinish::Abandon),
     );
