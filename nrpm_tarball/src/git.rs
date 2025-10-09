@@ -31,7 +31,7 @@ pub fn ptk_bytes(data: &str) -> Vec<u8> {
 /// These response values are formatted in such a way that they can be sent directly across the
 /// wire.
 ///
-/// This function assumes the tarball is untrusted.
+/// This function assumes the tarball is somewhat trusted (see onyx_api::storage::validate_tarball)
 ///
 /// Returns, `(refs, pack_bytes)`, both ready to be sent over the wire to a git client.
 pub fn extract_git_mock(tarball: &mut File, version_name: &str) -> Result<(Vec<u8>, Vec<u8>)> {

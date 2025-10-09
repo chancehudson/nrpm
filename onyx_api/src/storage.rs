@@ -8,6 +8,7 @@ use std::io::Write;
 use std::path::Component;
 use std::path::PathBuf;
 
+use anyhow::Context;
 use anyhow::Result;
 use nanoid::nanoid;
 use tar::Archive;
@@ -85,17 +86,42 @@ impl OnyxStorage {
     /// Nargo.toml
     ///
     /// Extract metadata from the Nargo.toml and return it.
+    ///
+    /// Here we check that the contents of a tarball are of bounded size, and bounded number of
+    /// entries. We check all path entries and disallow absolute paths, and paths referencing parent
+    /// directories. We disallow all non-regular files. We disallow file paths that are non-utf8.
+    /// We disallow file paths that are empty.
     pub fn validate_tarball(&self, file: &mut File) -> Result<(String, String)> {
         file.seek(SeekFrom::Start(0))?;
         let mut archive = Archive::new(file);
 
+        // maximum allowable size for the contents of the tarball
+        const MAX_ARCHIVE_SIZE: u64 = 20 * 1024 * 1024;
+        const MAX_ARCHIVE_ENTRIES: u64 = 10_000;
+        // total number of bytes in the tarball
+        let mut total_size = 0u64;
+        let mut total_entries = 0u64;
+
         let mut nargo_toml_bytes = None;
         for entry in archive.entries()? {
             let mut entry = entry?;
+            total_entries += 1;
+            if total_entries > MAX_ARCHIVE_ENTRIES {
+                anyhow::bail!("archive contains too many entries: {} files", total_entries);
+            }
+            total_size = total_size.saturating_add(entry.size());
+            if total_size > MAX_ARCHIVE_SIZE {
+                anyhow::bail!("archive too large: {} bytes", total_size);
+            }
             let path = entry.path()?.to_path_buf();
             if path.is_absolute() {
                 anyhow::bail!("absolute paths are disallowed in tarballs!");
             }
+            if path.as_os_str().len() == 0 {
+                anyhow::bail!("tarball contains entry with empty name");
+            }
+            path.to_str()
+                .with_context(|| "tarball entry path contains non-unicode characters")?;
             for component in path.components() {
                 match component {
                     Component::Normal(_) => {}
@@ -110,12 +136,15 @@ impl OnyxStorage {
                     if path == PathBuf::from("Nargo.toml") {
                         let mut bytes = Vec::default();
                         entry.read_to_end(&mut bytes)?;
-                        nargo_toml_bytes = Some(bytes.clone());
+                        nargo_toml_bytes = Some(bytes);
                     }
                 }
                 EntryType::Directory => {
                     continue;
                 }
+                EntryType::Link | EntryType::Symlink => anyhow::bail!(
+                    "Tar contains link or symlink. Only directories and files are allowed in package tarballs!"
+                ),
                 _ => anyhow::bail!(
                     "Irregular entry detected in tar archive. Only directories and files are allowed in package tarballs!"
                 ),
