@@ -175,6 +175,7 @@ impl Dependency {
         }
     }
 
+    /// Compute the path of the module relative to the package root directory.
     pub fn module_path(&self, pkg_path: &Path) -> Result<PathBuf> {
         if let Some(dir) = &self.directory {
             let dir_path = PathBuf::from(dir);
