@@ -85,6 +85,10 @@ fn build_server(state: OnyxState) -> axum::Router {
         .route("/v0/auth", post(user::current_auth))
         .route("/v0/propose_token", post(user::propose_token))
         .route("/v0/version/{id}", get(download::download_package))
+        .route(
+            "/v0/latest/{name}",
+            get(list_packages::load_package_version),
+        )
         // mocked retrieval for packages
         .route("/{package_name}", get(git::empty))
         .route("/{package_name}/info/refs", get(git::mocked_refs))
