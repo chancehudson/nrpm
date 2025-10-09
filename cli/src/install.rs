@@ -124,10 +124,10 @@ pub async fn install(path: PathBuf) -> Result<()> {
     // or that are local path references
     for entry in lockfile.entries().cloned().collect::<Vec<_>>() {
         let entry_identifier = entry.identifier();
-        if let Some((_, dep, _)) = all_dependencies.get(&entry_identifier)
-            && dep.is_local()
-        {
-            lockfile.remove(&entry_identifier);
+        if let Some((_, dep, _)) = all_dependencies.get(&entry_identifier) {
+            if dep.is_local() {
+                lockfile.remove(&entry_identifier);
+            }
         } else {
             lockfile.remove(&entry_identifier);
         }
