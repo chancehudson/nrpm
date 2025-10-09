@@ -19,6 +19,9 @@ tar = { workspace = true }
 tempfile = { workspace = true }
 reqwest = { workspace = true }
 nanoid = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+
 nrpm_tarball = { workspace = true }
 onyx_api = { workspace = true, features = ["publish"] }
 nargo_parse = { path = "../nargo_parse" }

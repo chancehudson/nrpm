@@ -33,7 +33,8 @@ impl NargoConfig {
             path.to_path_buf()
         };
         if let Err(e) = std::fs::metadata(&nargo_path) {
-            anyhow::bail!("Unable to stat path: {:?} {:?}", path, e);
+            log::debug!("{e:?}");
+            anyhow::bail!("Unable to stat path: {:?}", nargo_path);
         }
         let mut str = String::default();
         File::open(nargo_path)?.read_to_string(&mut str)?;

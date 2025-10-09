@@ -36,6 +36,8 @@ struct OnyxState {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    env_logger::init();
+
     let db = Arc::new(Database::create("./db.redb")?);
     create_tables(db.clone())?;
 
@@ -45,7 +47,7 @@ async fn main() -> Result<()> {
     });
     let port = std::env::var("PORT").unwrap_or("3000".to_string());
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
-    println!("Listening on port {port}");
+    log::info!("Listening on port {port}");
     axum::serve(listener, app).await?;
     Ok(())
 }

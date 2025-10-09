@@ -10,6 +10,7 @@ use nargo_parse::*;
 
 #[derive(Clone, Debug)]
 pub struct Lockfile {
+    #[allow(dead_code)]
     pub version: i64,
     packages_cache: HashMap<String, LockEntry>,
 }
@@ -37,7 +38,7 @@ impl Lockfile {
                     })
                 })
                 .collect::<Result<Vec<LockEntry>>>()?,
-            _ => anyhow::bail!("malformed lockfile, packages must be an array"),
+            _ => anyhow::bail!("malformed lockfile, packages must be an array: {path:?}"),
         };
         let mut packages_cache = HashMap::default();
         for entry in packages {
@@ -54,11 +55,11 @@ impl Lockfile {
             "malformed lockfile, does not contain version"
         ))? {
             toml::Value::Integer(version) => *version,
-            _ => anyhow::bail!("malformed lockfile, version must be an integer"),
+            _ => anyhow::bail!("malformed lockfile, version must be an integer: {path:?}"),
         };
         if version != 0 {
             anyhow::bail!(
-                "bad version number, only version 0 is supported by this version of nrpm"
+                "bad version number, only version 0 is supported by this version of nrpm: {path:?}"
             );
         }
         Ok(Self {

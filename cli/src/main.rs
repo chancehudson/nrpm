@@ -1,6 +1,3 @@
-use std::fs::File;
-use std::io;
-use std::io::Read;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -10,16 +7,21 @@ use clap::ArgAction;
 use clap::Command;
 use nanoid::nanoid;
 use onyx_api::prelude::*;
-use std::fs;
-use tempfile::tempfile;
 use tokio;
 
 mod install;
 mod lockfile;
 mod publish;
 
+#[cfg(debug_assertions)]
+const REGISTRY_URL: &str = "http://localhost:8080";
+#[cfg(not(debug_assertions))]
+const REGISTRY_URL: &str = "https://nrpm.io";
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    env_logger::init();
+
     if let Err(err) = run().await {
         eprintln!("❌ {}", err);
 
@@ -75,11 +77,7 @@ async fn run() -> Result<()> {
 async fn attempt_auth() -> Result<LoginResponse> {
     let proposed_token = nanoid!();
     // we'll create a token and open the web browser
-    #[cfg(debug_assertions)]
-    let url = "http://localhost:8080";
-    #[cfg(not(debug_assertions))]
-    let url = "https://nrpm.io";
-    let url = format!("{url}/propose_token?token={proposed_token}");
+    let url = format!("{REGISTRY_URL}/propose_token?token={proposed_token}");
     println!("    {url}");
     open::that(url)?;
 
@@ -124,6 +122,7 @@ fn cli() -> Command {
         )
         .subcommand(
             Command::new("install")
+            .alias("i")
                 .about("install dependencies for a local project")
                 .arg(Arg::new("path").short('p').long("path").value_name("path").action(ArgAction::Set).help("Install dependencies for a package at a path"))
         )

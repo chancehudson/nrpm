@@ -82,8 +82,11 @@ pub async fn publish(
 
     let actual_hash = nrpm_tarball::hash(&mut tarball)?;
 
-    if blake3::Hash::from_hex(publish_data.hash)? != actual_hash {
-        println!("WARNING: hash mismatch for uploaded package, computed: {actual_hash}");
+    if blake3::Hash::from_hex(&publish_data.hash)? != actual_hash {
+        log::warn!(
+            "hash mismatch for uploaded package, computed: {actual_hash}, expected: {}",
+            publish_data.hash
+        );
         return Err(OnyxError::bad_request(
             "Hash mismatch for uploaded tarball!",
         ));
@@ -140,8 +143,8 @@ pub async fn publish(
                 HashId::from(actual_hash).to_string(),
                 &package_version,
             ) {
-                println!(
-                    "WARNING: package already exists with hash: {} {}",
+                log::warn!(
+                    "package already exists with hash: {} {:?}",
                     actual_hash.to_string(),
                     e
                 );
@@ -360,7 +363,6 @@ mod tests {
             test.publish(Some(data.clone()), tarball.clone()).await?;
 
         let e = test.publish(Some(data), tarball).await.unwrap_err();
-        println!("{e}");
         assert!(
             e.to_string()
                 .starts_with("Package with hash already exists")

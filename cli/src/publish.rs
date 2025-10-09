@@ -17,7 +17,7 @@ pub async fn upload_tarball(
     pkg_dir: &Path,
     archive_path: Option<PathBuf>,
 ) -> Result<()> {
-    println!("📦 Packaging {:?}", pkg_dir);
+    log::info!("📦 Packaging {:?}", pkg_dir);
     if let Ok(metadata) = std::fs::metadata(pkg_dir) {
         if !metadata.is_dir() {
             anyhow::bail!("Path is not a directory: {:?}", pkg_dir);
@@ -38,6 +38,8 @@ pub async fn upload_tarball(
         std::io::copy(&mut tarball, &mut File::create(path)?)?;
         return Ok(());
     }
+    let hash = nrpm_tarball::hash(&mut tarball)?;
+
     println!("🔃 Redirecting to authorize");
     tokio::time::sleep(Duration::from_millis(500)).await;
     let login = super::attempt_auth().await?;
@@ -53,7 +55,6 @@ pub async fn upload_tarball(
         return Ok(());
     }
 
-    let hash = nrpm_tarball::hash(&mut tarball)?;
     // reset the file handle for copying to final destination
     tarball.seek(std::io::SeekFrom::Start(0))?;
     let mut tarball_bytes = vec![];
@@ -77,8 +78,8 @@ pub async fn upload_tarball(
             println!("Package id: {package_id}");
         }
         Err(e) => {
-            println!("ERROR: failed to publish package");
-            println!("{e}");
+            eprintln!("failed to publish package");
+            eprintln!("{e:?}");
         }
     }
     Ok(())

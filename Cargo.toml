@@ -18,6 +18,8 @@ bincode = { version = "1.0.0" }
 onyx_api = "0.2.0"
 nrpm_tarball = "0.1.0"
 semver = "1"
+log = "0"
+env_logger = "0"
 
 [profile]
 

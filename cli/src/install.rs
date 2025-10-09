@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use anyhow::Context;
 use anyhow::Result;
 use indicatif::ProgressStyle;
 use nargo_parse::*;
@@ -32,6 +33,11 @@ pub async fn install(_api: &OnyxApi, path: PathBuf) -> Result<()> {
     } else if !dep_cache_path.exists() {
         std::fs::create_dir(&dep_cache_path)?;
     }
+    // try to load the Nargo.toml in the target directory here
+    // bail with a helpful error message if it's not there
+    NargoConfig::load(&path)
+        .with_context(|| "Unable to find a Nargo.toml in the target directory")?;
+
     let progress = indicatif::ProgressBar::new_spinner();
     let multiprogress = indicatif::MultiProgress::new();
     let progress = multiprogress.add(progress);
