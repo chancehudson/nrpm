@@ -4,7 +4,7 @@ export default {
 
       if (url.pathname.endsWith("/info/refs")) {
           return new Response("", {
-              headers: { "Location": `https://api.nrpm.io${url.pathname}` },
+              headers: { "Location": `https://api.nrpm.io${url.pathname}${url.search}` },
               status: 308
           });
       }
