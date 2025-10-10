@@ -3323,7 +3323,7 @@ dependencies = [
 
 [[package]]
 name = "nrpm_tarball"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "blake3",
@@ -3402,7 +3402,7 @@ dependencies = [
 
 [[package]]
 name = "onyx_api"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "bincode",
