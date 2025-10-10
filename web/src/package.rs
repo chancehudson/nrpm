@@ -1,4 +1,5 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 use dioxus::prelude::*;
 use onyx_api::prelude::*;
@@ -12,9 +13,10 @@ pub fn PackageView(package_name: String) -> Element {
     let mut is_loading = use_signal(|| false);
     let mut status = use_signal(|| String::new());
     let mut package: Signal<Option<(PackageModel, PackageVersionModel)>> = use_signal(|| None);
-    let mut package_config: Signal<Option<(NargoConfig, HashMap<PathBuf, Vec<u8>>)>> =
+    let mut package_config: Signal<Option<(NargoConfig, BTreeMap<PathBuf, Vec<u8>>)>> =
         use_signal(|| None);
     let mut package_hash_verified = use_signal(|| false);
+    let mut active_file = use_signal(|| PathBuf::from("README.md"));
 
     // On mount fetch the package metadata, load the package tarball, decompress and analyze
     use_effect(move || {
@@ -24,7 +26,7 @@ pub fn PackageView(package_name: String) -> Element {
 
             // load the latest package version
             let api = OnyxApi::default();
-            let (package, version) = match api.load_package_latest_version(&package_name).await {
+            let (_package, version) = match api.load_package_latest_version(&package_name).await {
                 Ok(p) => {
                     package.set(Some(p.clone()));
                     p
@@ -47,7 +49,12 @@ pub fn PackageView(package_name: String) -> Element {
             };
             let (_config, entries) = match nrpm_tarball::extract_metadata(bytes) {
                 Ok(data) => {
-                    package_config.set(Some(data.clone()));
+                    let (config, mut entries) = data.clone();
+                    let mut sorted_entries = BTreeMap::new();
+                    for (k, v) in std::mem::take(&mut entries) {
+                        sorted_entries.insert(k, v);
+                    }
+                    package_config.set(Some((config, sorted_entries)));
                     data
                 }
                 Err(e) => {
@@ -97,14 +104,21 @@ pub fn PackageView(package_name: String) -> Element {
     }
     let (package, version) = package_inner.as_ref().unwrap();
     let (package_config, package_contents) = package_config_inner.as_ref().unwrap();
-    let readme_raw = package_contents
-        .get(&PathBuf::from("README.md"))
+    let active_file_path = active_file.read().clone();
+    let file_content = package_contents
+        .get(&active_file_path)
         .map(|v| {
-            String::from_utf8(v.clone()).unwrap_or("Error: README.md is not valid UTF8!".into())
+            String::from_utf8(v.clone()).unwrap_or("Error: Active file is not valid UTF8!".into())
         })
         .unwrap_or("No README.md found for this package!\n\nIf you're the author you should consider adding one 😊".into());
 
-    let readme_html = ammonia::clean(&markdown::to_html(&readme_raw));
+    let file_content_rendered = if let Some(ext) = active_file_path.extension()
+        && ext == "md"
+    {
+        Some(ammonia::clean(&markdown::to_html(&file_content)))
+    } else {
+        None
+    };
 
     rsx! {
         Header { show_auth: true },
@@ -114,7 +128,7 @@ pub fn PackageView(package_name: String) -> Element {
             div {
                 style: "display: flex;
                        flex-direction: row;
-                       flex-wrap: wrap;
+                       flex-wrap: wrap-reverse;
                        justify-content: space-between;
                        align-items: flex-start;
                        margin-bottom: 4px;
@@ -129,9 +143,18 @@ pub fn PackageView(package_name: String) -> Element {
                         style: "margin: 0px; margin-bottom: 8px;",
                         "{package.name}@{version.name}"
                     }
-                    for (path, data) in package_contents {
+                    for (path, data) in package_contents.iter().map(|(k, v)| (k.clone(), v)) {
                         div {
-                            style: "padding-left: 8px",
+                            style: "padding-left: 8px; cursor: pointer;",
+                            onclick: move |_| {
+                                active_file.set(path.clone());
+                            },
+                            if active_file_path == path {
+                                span {
+                                    style: "color: purple; font-weight: bold;",
+                                    "> "
+                                },
+                            },
                             "{path.to_string_lossy()}"," - ","{data.len()}"," bytes"
                         }
                     }
@@ -274,8 +297,15 @@ pub fn PackageView(package_name: String) -> Element {
             }
             div {
                 style: "background: #f5f5f5; padding: 4px; border-radius: 2px; border: 1px solid gray;",
-                div {
-                    dangerous_inner_html: readme_html
+                if let Some(content) = file_content_rendered {
+                    div {
+                        dangerous_inner_html: content
+                    }
+                } else {
+                    pre {
+                        style: "overflow: scroll",
+                        "{file_content}"
+                    }
                 }
             }
         }
