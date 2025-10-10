@@ -9,6 +9,7 @@ Usage: nrpm [OPTIONS] [COMMAND]
 
 Commands:
   publish  publish a package to the registry
+  install  install dependencies for a local project
   help     Print this message or the help of the given subcommand(s)
 
 Options:
