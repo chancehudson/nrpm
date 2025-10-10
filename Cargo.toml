@@ -15,11 +15,13 @@ redb = "2.6.0"
 serde_json = "1.0.140"
 nanoid = "0.4.0"
 bincode = { version = "1.0.0" }
-onyx_api = "0.2.0"
-nrpm_tarball = "0.1.0"
 semver = "1"
 log = "0"
 env_logger = "0"
+
+onyx_api = "0.2.0"
+nrpm_tarball = "0.1.0"
+nargo_parse = "0.1.0"
 
 [profile]
 
@@ -36,3 +38,4 @@ inherits = "dev"
 [patch.crates-io]
 onyx_api = { path = "./onyx_api" }
 nrpm_tarball = { path = "./nrpm_tarball" }
+nargo_parse = { path = "./nargo_parse" }

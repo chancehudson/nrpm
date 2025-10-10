@@ -11,12 +11,23 @@ use super::OnyxError;
 use super::OnyxState;
 use super::PACKAGE_TABLE;
 
+pub async fn load_package_versions(
+    State(state): State<OnyxState>,
+    Path(package_name): Path<String>,
+) -> Result<ResponseJson<(PackageModel, Vec<PackageVersionModel>)>, OnyxError> {
+    let (package, versions) =
+        PackageModel::versions(state.db, &package_name)?.ok_or(OnyxError::bad_request(
+            &format!("Unable to load versions for package \"{}\"", package_name),
+        ))?;
+    Ok(ResponseJson((package, versions)))
+}
+
 pub async fn load_package_version(
     State(state): State<OnyxState>,
-    Path(name): Path<String>,
+    Path(package_name): Path<String>,
 ) -> Result<ResponseJson<(PackageModel, PackageVersionModel)>, OnyxError> {
-    let (package, version) = PackageModel::latest_version(state.db, &name)?.ok_or(
-        OnyxError::bad_request(&format!("Unable to resolve package \"{}\"", name)),
+    let (package, version) = PackageModel::latest_version(state.db, &package_name)?.ok_or(
+        OnyxError::bad_request(&format!("Unable to resolve package \"{}\"", package_name)),
     )?;
     Ok(ResponseJson((package, version)))
 }

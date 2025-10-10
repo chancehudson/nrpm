@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::fs::File;
+use std::io::Cursor;
 use std::io::Read;
 use std::io::Seek;
 use std::io::SeekFrom;
@@ -7,14 +9,44 @@ use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 
+use anyhow::Context;
 use anyhow::Result;
 use ignore::WalkBuilder;
 use tar::Archive;
 use tar::EntryType;
 
+#[cfg(feature = "git")]
 mod git;
 
+#[cfg(feature = "git")]
 pub use git::*;
+
+use nargo_parse::*;
+
+pub fn extract_metadata(
+    tarball_bytes: Vec<u8>,
+) -> Result<(NargoConfig, HashMap<PathBuf, Vec<u8>>)> {
+    let reader = Cursor::new(tarball_bytes);
+    let mut archive = Archive::new(reader);
+    let mut nargo_config = None;
+    let mut out = HashMap::default();
+    for entry in archive.entries_with_seek()? {
+        let mut entry = entry?;
+        let mut bytes = Vec::default();
+        entry.read_to_end(&mut bytes)?;
+        let entry_path = entry.path()?;
+        if entry_path == PathBuf::from("Nargo.toml") {
+            let config_str =
+                String::from_utf8(bytes.clone()).context("Nargo.toml is not valid unicode")?;
+            nargo_config = Some(NargoConfig::from_str(&config_str)?);
+        }
+        out.insert(entry_path.to_path_buf(), bytes);
+    }
+    Ok((
+        nargo_config.ok_or(anyhow::anyhow!("Unable to find Nargo.toml in tarball!"))?,
+        out,
+    ))
+}
 
 /// Do a content hash of a directory. This may differ from a tarball content hash based on
 /// gitignores in parent directories on different systems.

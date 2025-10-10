@@ -1,5 +1,4 @@
 use anyhow::Result;
-use reqwest::multipart;
 use serde_json::json;
 
 use super::types::*;
@@ -24,8 +23,63 @@ impl OnyxApi {
         Ok(Self { url })
     }
 
-    pub fn version_download_url(&self, id: HashId) -> String {
+    pub fn version_download_url(&self, id: &HashId) -> String {
         format!("{}/v0/version/{}", self.url, id.to_string())
+    }
+
+    pub async fn download_tarball(&self, version_id: &HashId) -> Result<Vec<u8>> {
+        let download_url = self.version_download_url(version_id);
+        let response = reqwest::Client::new().get(download_url).send().await?;
+        if response.status().is_success() {
+            let data = response.bytes().await?;
+            Ok(data.into())
+        } else {
+            anyhow::bail!(
+                "failed to download version id \"{}\": {}",
+                version_id.to_string(),
+                response.text().await?
+            );
+        }
+    }
+
+    pub async fn load_package_versions(
+        &self,
+        package_name: &str,
+    ) -> Result<(PackageModel, Vec<PackageVersionModel>)> {
+        let response = reqwest::Client::new()
+            .get(format!("{}/v0/packages/{package_name}/versions", self.url))
+            .send()
+            .await?;
+        if response.status().is_success() {
+            let data = response.json().await?;
+            Ok(data)
+        } else {
+            anyhow::bail!(
+                "failed to load versions of package \"{}\": {}",
+                package_name,
+                response.text().await?
+            );
+        }
+    }
+
+    pub async fn load_package_latest_version(
+        &self,
+        package_name: &str,
+    ) -> Result<(PackageModel, PackageVersionModel)> {
+        let response = reqwest::Client::new()
+            .get(format!("{}/v0/packages/{package_name}/latest", self.url))
+            .send()
+            .await?;
+        if response.status().is_success() {
+            let data = response.json().await?;
+            Ok(data)
+        } else {
+            anyhow::bail!(
+                "failed to load latest version of package \"{}\": {}",
+                package_name,
+                response.text().await?
+            );
+        }
     }
 
     pub async fn load_packages(&self) -> Result<Vec<(PackageModel, PackageVersionModel)>> {
@@ -107,6 +161,8 @@ impl OnyxApi {
 
     #[cfg(feature = "publish")]
     pub async fn publish(&self, request: PublishData, tarball: Vec<u8>) -> Result<PublishResponse> {
+        use reqwest::multipart;
+
         let form = multipart::Form::new()
             .part(
                 "tarball",

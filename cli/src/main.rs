@@ -85,7 +85,7 @@ async fn run() -> Result<()> {
 async fn attempt_auth() -> Result<LoginResponse> {
     let proposed_token = nanoid!();
     // we'll create a token and open the web browser
-    let url = format!("{REGISTRY_URL}/propose_token?token={proposed_token}");
+    let url = format!("{REGISTRY_URL}/_/propose_token?token={proposed_token}");
     println!("    {url}");
     open::that(url)?;
 

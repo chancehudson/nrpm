@@ -18,7 +18,7 @@ log = { workspace = true }
 env_logger = { workspace = true }
 
 onyx_api = { workspace = true, features = ["server"] }
-nrpm_tarball = { workspace = true }
+nrpm_tarball = { workspace = true, features = ["git"] }
 
 axum = { version = "0.8.4", features = ["http2", "multipart"] }
 rand = "0.9.1"

@@ -18,7 +18,7 @@ pub fn HomeView() -> Element {
                 Ok(p) => {
                     let mut a = p
                         .into_iter()
-                        .map(|(p, v)| (p, v.clone(), api.version_download_url(v.id)))
+                        .map(|(p, v)| (p, v.clone(), api.version_download_url(&v.id)))
                         .collect::<Vec<_>>();
                     a.sort_by(|v0, v1| v1.1.created_at.cmp(&v0.1.created_at));
                     packages.set(a);
@@ -60,8 +60,11 @@ pub fn HomeView() -> Element {
                 div {
                     key: "{package.id}",
                     style: "display: flex; flex-direction: column; border-left: 1px solid black; border-bottom: 1px solid black; padding: 4px; margin-top: 4px;",
-                    div {
-                        "{package.name}@{latest_version.name}"
+                    a {
+                        href: "/{package.name}",
+                        div {
+                            "{package.name}@{latest_version.name}"
+                        },
                     },
                     div {
                         "published {time_ago(latest_version.created_at)}"

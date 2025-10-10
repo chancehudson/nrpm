@@ -89,6 +89,10 @@ impl NargoConfig {
 pub struct Package {
     pub name: String,
     pub version: Option<String>,
+    pub description: Option<String>,
+    pub authors: Option<Vec<String>>,
+    pub repository: Option<String>,
+    pub keywords: Option<Vec<String>>,
 }
 
 /// Represents each entry in the `dependencies` section of a `Nargo.toml` file.

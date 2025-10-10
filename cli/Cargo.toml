@@ -22,9 +22,9 @@ nanoid = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
 
-nrpm_tarball = { workspace = true }
+nrpm_tarball = { workspace = true, features = ["fs"] }
 onyx_api = { workspace = true, features = ["publish"] }
-nargo_parse = { path = "../nargo_parse" }
+nargo_parse = { workspace = true }
 
 clap = "4.5.40"
 dialoguer = "0.11.0"

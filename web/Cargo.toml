@@ -9,6 +9,11 @@ serde = { workspace = true }
 reqwest = { workspace = true }
 onyx_api = { workspace = true }
 
+nrpm_tarball = { workspace = true }
+nargo_parse = { workspace = true }
+
+markdown = "1"
+ammonia = "4"
 dioxus = { version = "0.6.3", features = ["router"] }
 serde_json = "1.0.140"
 dioxus-web = "0.6.3"

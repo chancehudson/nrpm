@@ -21,9 +21,9 @@ blake3 = { workspace = true }
 nanoid = { workspace = true }
 tar = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
+log = { workspace = true }
 
 nrpm_tarball = { workspace = true, optional = true }
-
-nargo_parse = { path = "../nargo_parse" }
+nargo_parse = { workspace = true }
 
 hex = "0.4.3"
