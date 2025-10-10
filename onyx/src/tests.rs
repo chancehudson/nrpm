@@ -83,7 +83,7 @@ version = \"{}\"
         let tar_file = tempfile()?;
         let mut tarball = nrpm_tarball::create(workdir.path(), tar_file)?;
         let mut tarball_clone = tarball.try_clone()?;
-        let hash = nrpm_tarball::hash(&mut tarball)?;
+        let hash = nrpm_tarball::hash_tarball(&mut tarball)?;
 
         tarball_clone.seek(std::io::SeekFrom::Start(0))?;
         let mut tarball_bytes = vec![];

@@ -81,7 +81,7 @@ pub async fn publish(
     // retrieve name and version from the contents of the tarball
     let (package_name, package_version) = state.storage.validate_tarball(&mut tarball)?;
 
-    let actual_hash = nrpm_tarball::hash(&mut tarball)?;
+    let actual_hash = nrpm_tarball::hash_tarball(&mut tarball)?;
 
     if blake3::Hash::from_hex(&publish_data.hash)? != actual_hash {
         log::warn!(

@@ -14,6 +14,7 @@ pub fn PackageView(package_name: String) -> Element {
     let mut package: Signal<Option<(PackageModel, PackageVersionModel)>> = use_signal(|| None);
     let mut package_config: Signal<Option<(NargoConfig, HashMap<PathBuf, Vec<u8>>)>> =
         use_signal(|| None);
+    let mut package_hash_verified = use_signal(|| false);
 
     // On mount fetch the package metadata, load the package tarball, decompress and analyze
     use_effect(move || {
@@ -23,20 +24,51 @@ pub fn PackageView(package_name: String) -> Element {
 
             // load the latest package version
             let api = OnyxApi::default();
-            match api.load_package_latest_version(&package_name).await {
+            let (package, version) = match api.load_package_latest_version(&package_name).await {
                 Ok(p) => {
                     package.set(Some(p.clone()));
+                    p
                 }
-                Err(e) => status.set(format!("Error: {}", e)),
+                Err(e) => {
+                    status.set(format!("Error: {}", e));
+                    is_loading.set(false);
+                    return;
+                }
             };
 
             // download the package tarball and extract to get the metadata
-            if let Some((_package, version)) = package.read().as_ref() {
-                match api.download_tarball(&version.id).await {
-                    Ok(bytes) => {
-                        package_config.set(nrpm_tarball::extract_metadata(bytes).ok());
-                    }
-                    Err(e) => status.set(format!("Error: failed to download tarball bytes! {}", e)),
+            let bytes = match api.download_tarball(&version.id).await {
+                Ok(bytes) => bytes,
+                Err(e) => {
+                    status.set(format!("Error: failed to download tarball bytes! {}", e));
+                    is_loading.set(false);
+                    return;
+                }
+            };
+            let (_config, entries) = match nrpm_tarball::extract_metadata(bytes) {
+                Ok(data) => {
+                    package_config.set(Some(data.clone()));
+                    data
+                }
+                Err(e) => {
+                    status.set(format!("Error: failed to parse tarball bytes! {}", e));
+                    is_loading.set(false);
+                    return;
+                }
+            };
+
+            match nrpm_tarball::hash_content(
+                entries
+                    .into_iter()
+                    .map(|(path, data)| Ok(Some((path, data)))),
+            ) {
+                Ok(hash) => {
+                    package_hash_verified.set(hash.to_string() == version.id.to_string());
+                }
+                Err(e) => {
+                    status.set(format!("Error: failed to hash tarball content! {}", e));
+                    is_loading.set(false);
+                    return;
                 }
             }
             is_loading.set(false);
@@ -114,8 +146,30 @@ pub fn PackageView(package_name: String) -> Element {
                         "published {time_ago(version.created_at)}"
                     }
                     div {
-                        "blake3: {version.id.to_string().chars().take(10).collect::<String>()}..."
+                        "blake3: {version.id.to_string().chars().take(13).collect::<String>()}..."
                     },
+                    if *package_hash_verified.read() {
+                        div {
+                            "✅ hash verified"
+                        }
+                    } else {
+                        div {
+                            "❌ hash mismatch!"
+                        }
+                    }
+                    div {
+                        style: "width: 100%; margin: 4px 0px; border-bottom: 1px solid black;"
+                    },
+                    div {
+                        h4 {
+                            style: "margin: 0px",
+                            "Install"
+                        }
+                    },
+                    div {
+                        style: "padding: 8px; font-family: monospace; border: 1px solid gray; border-radius: 2px;",
+                        "nrpm install {package.name}"
+                    }
                     div {
                         style: "width: 100%; margin: 4px 0px; border-bottom: 1px solid black;"
                     },

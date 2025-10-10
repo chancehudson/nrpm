@@ -51,7 +51,6 @@ pub fn extract_metadata(
 /// Do a content hash of a directory. This may differ from a tarball content hash based on
 /// gitignores in parent directories on different systems.
 pub fn hash_dir(path: &Path) -> Result<blake3::Hash> {
-    let mut ordered_files: BTreeMap<PathBuf, blake3::Hash> = BTreeMap::new();
     let walker = WalkBuilder::new(&path)
         .git_ignore(true)
         .git_global(false)
@@ -63,38 +62,61 @@ pub fn hash_dir(path: &Path) -> Result<blake3::Hash> {
             !(entry.file_name() == ".git" && entry.file_type().map_or(false, |ft| ft.is_dir()))
         })
         .build();
-    for entry in walker {
+    hash_content(walker.map(|entry| {
         let entry = entry?;
         if entry.path().is_dir() {
-            continue;
+            return Ok(None);
         }
         if entry.path().is_symlink() {
             anyhow::bail!("symlinks are not allowed in nrpm hashes");
         }
-        let mut hasher = blake3::Hasher::new();
-        // only hash the filepath and the contents
-        let rel_path = entry.path().strip_prefix(path)?;
-        log::trace!("beginning hash for {:?}", entry.path());
-        for component in rel_path.components() {
+        let bytes = std::fs::read(entry.path())?;
+        Ok(Some((
+            entry.path().strip_prefix(path)?.to_path_buf(),
+            bytes,
+        )))
+    }))
+}
+
+/// Compute a hash of a set of paths and bytes. Hashes should be consistent regardless of path
+/// ordering.
+///
+/// The iterator `Item` is wonky because we need to read bytes from the system lazily, and
+/// potentially skip entries in the sequence.
+pub fn hash_content(
+    entries: impl Iterator<Item = Result<Option<(PathBuf, Vec<u8>)>>>,
+) -> Result<blake3::Hash> {
+    // this approach allows content hashes to be calculated in parallel
+    // while remaining deterministic
+    let mut ordered_files: BTreeMap<PathBuf, blake3::Hash> = BTreeMap::new();
+    for entry in entries {
+        let entry = entry?;
+        if entry.is_none() {
+            continue;
+        }
+        let (path, bytes) = entry.unwrap();
+        log::trace!("beginning hash for {:?}", path);
+        let mut inner_hasher = blake3::Hasher::new();
+        for component in path.components() {
             match component {
                 Component::Normal(component) => {
                     log::trace!("adding bytes: {component:?}");
-                    hasher.update(component.as_encoded_bytes());
+                    inner_hasher.update(component.as_encoded_bytes());
                 }
-                _ => anyhow::bail!("Non-normal path component detected in tarball"),
+                _ => anyhow::bail!("Non-normal path component detected hash function"),
             }
         }
-        let bytes = std::fs::read(entry.path())?;
-        log::trace!("adding file contents ({} bytes)", bytes.len());
-        hasher.update_reader(bytes.as_slice())?;
-        let hash = hasher.finalize();
-        log::trace!("entry: {:?} hash: {}", entry.path(), hash.to_string());
-        ordered_files.insert(rel_path.to_path_buf(), hash);
+        log::trace!("hashing file contents ({} bytes)", bytes.len());
+        inner_hasher.update_reader(bytes.as_slice())?;
+        let inner_hash = inner_hasher.finalize();
+        log::trace!("entry: {:?} hash: {}", path, inner_hash.to_string());
+        ordered_files.insert(path, inner_hash);
     }
+    // now combine our ordered hashes into a final hash
     let mut hasher = blake3::Hasher::new();
     log::trace!("{} entries, computing outer hash", ordered_files.len());
     for (file, hash) in ordered_files {
-        log::trace!("{file:?} hashing bytes: {}", hash.to_string());
+        log::trace!("{file:?} adding bytes: {}", hash.to_string());
         hasher.update(hash.as_bytes());
     }
     let hash = hasher.finalize();
@@ -107,56 +129,26 @@ pub fn hash_dir(path: &Path) -> Result<blake3::Hash> {
 /// all file hashes in lexicographic order of file paths.
 ///
 /// This function assumes the tarball is untrusted.
-pub fn hash(tarball: &mut File) -> Result<blake3::Hash> {
+pub fn hash_tarball(tarball: &mut File) -> Result<blake3::Hash> {
     tarball.seek(SeekFrom::Start(0))?;
     let mut archive = Archive::new(tarball);
 
-    // this approach allows content hashes to be calculated in parallel
-    // while remaining deterministic
-    let mut ordered_files: BTreeMap<PathBuf, blake3::Hash> = BTreeMap::new();
-    for entry in archive.entries()? {
+    hash_content(archive.entries()?.map(|entry| {
         let mut entry = entry?;
         match entry.header().entry_type() {
             EntryType::Regular => {
-                let mut hasher = blake3::Hasher::new();
-                // only hash the filepath and the contents
-                let path = entry.path()?.to_path_buf();
-                log::trace!("beginning hash for {:?}", path);
-                for component in path.components() {
-                    match component {
-                        Component::Normal(component) => {
-                            log::trace!("hashing bytes: {component:?}");
-                            hasher.update(component.as_encoded_bytes());
-                        }
-                        _ => anyhow::bail!("Non-normal path component detected in tarball"),
-                    }
-                }
                 let mut bytes = Vec::default();
                 entry.read_to_end(&mut bytes)?;
-                log::trace!("hashing file contents ({} bytes)", bytes.len());
-                hasher.update_reader(bytes.as_slice())?;
-                let hash = hasher.finalize();
-                log::trace!("entry: {:?} hash: {}", path, hash.to_string());
-                ordered_files.insert(path, hash);
+                Ok(Some((entry.path()?.to_path_buf(), bytes)))
             }
             EntryType::Directory => {
-                continue;
+                Ok(None)
             }
             _ => anyhow::bail!(
                 "Irregular entry detected in tar archive. Only directories and files are allowed in package tarballs!"
             ),
         }
-    }
-    // now combine our ordered hashes into a final hash
-    let mut hasher = blake3::Hasher::new();
-    log::trace!("{} entries, computing outer hash", ordered_files.len());
-    for (file, hash) in ordered_files {
-        log::trace!("{file:?} adding bytes: {}", hash.to_string());
-        hasher.update(hash.as_bytes());
-    }
-    let hash = hasher.finalize();
-    log::trace!("final hash: {}", hash.to_string());
-    Ok(hash)
+    }))
 }
 
 /// Create a tarball from `path`, which must exist and be a directory. Returned value with be
@@ -246,7 +238,7 @@ mod tests {
 
         let mut tarball = create(tempdir.path(), tar_file)?;
 
-        assert_eq!(hash(&mut tarball)?, hash_dir(tempdir.path())?);
+        assert_eq!(hash_tarball(&mut tarball)?, hash_dir(tempdir.path())?);
 
         Ok(())
     }

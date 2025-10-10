@@ -38,7 +38,7 @@ pub async fn upload_tarball(
         std::io::copy(&mut tarball, &mut File::create(path)?)?;
         return Ok(());
     }
-    let hash = nrpm_tarball::hash(&mut tarball)?;
+    let hash = nrpm_tarball::hash_tarball(&mut tarball)?;
 
     println!("🔃 Redirecting to authorize");
     tokio::time::sleep(Duration::from_millis(500)).await;
