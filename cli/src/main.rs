@@ -1,13 +1,17 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
+use anyhow::Context;
 use anyhow::Result;
 use clap::Arg;
 use clap::ArgAction;
 use clap::Command;
 use nanoid::nanoid;
+use nargo_parse::Dependency;
+use nargo_parse::NargoConfig;
 use onyx_api::prelude::*;
 use tokio;
+use tokio::task::JoinSet;
 
 mod install;
 mod lockfile;
@@ -77,6 +81,30 @@ async fn run() -> Result<()> {
                 }
             })
             .unwrap_or(cwd);
+
+        // the user wants to install a package and add it to Nargo.toml, let's give it a shot
+        let mut join_set: JoinSet<Result<Dependency>> = JoinSet::new();
+        let packages_to_install = 
+            matches.get_many::<String>("package_name").unwrap_or_default();
+        for new_dep_name in packages_to_install{
+            let new_dep_name = new_dep_name.clone();
+            let api = api.clone();
+            join_set.spawn(async move {
+            let (package, version) = api.load_package_latest_version(&new_dep_name).await.context("Unable to install package \"{new_dep_name}\"")?;
+            println!("Adding package: {}@{}", package.name, version.name);
+            let git_url = format!("{REGISTRY_URL}/{new_dep_name}");
+            let tag = version.name;
+            Ok(Dependency::new_git(new_dep_name.to_string(), git_url, tag))
+            });
+        }
+        let mut new_packages: Vec<Dependency> = Vec::default();
+        while let Some(dep) = join_set.join_next().await {
+            let dep = dep??;
+            new_packages.push(dep);
+        }
+        if !new_packages.is_empty(){
+            NargoConfig::add_dependencies_in_place(&path, new_packages).context("Failed to write new dependencies to Nargo.toml")?;
+        }
         install::install(path).await?;
     }
     Ok(())
@@ -133,5 +161,8 @@ fn cli() -> Command {
             .alias("i")
                 .about("install dependencies for a local project")
                 .arg(Arg::new("path").short('p').long("path").value_name("path").action(ArgAction::Set).help("Install dependencies for a package at a path"))
+                .arg(Arg::new("package_name").value_name("package_name").action(ArgAction::Append))
+                // .arg(clap::arg!([package_name] "Name of a package to install"))
+                
         )
 }

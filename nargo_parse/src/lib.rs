@@ -9,9 +9,10 @@ use anyhow::Context;
 use anyhow::Result;
 use reqwest::Url;
 use serde::Deserialize;
+use serde::Serialize;
 
 /// Represents the contents of a `Nargo.toml` file.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NargoConfig {
     pub package: Package,
     #[serde(default)]
@@ -39,6 +40,45 @@ impl NargoConfig {
         let mut str = String::default();
         File::open(nargo_path)?.read_to_string(&mut str)?;
         Self::from_str(&str)
+    }
+
+    pub fn add_dependencies_in_place(path: &Path, new_dependencies: Vec<Dependency>) -> Result<()> {
+        let nargo_path = if path.is_dir() {
+            path.join("Nargo.toml")
+        } else {
+            path.to_path_buf()
+        };
+        let mut str = String::default();
+        File::open(&nargo_path)?.read_to_string(&mut str)?;
+        let mut doc = str.parse::<toml_edit::DocumentMut>()?;
+        if doc.get("dependencies").is_none() {
+            doc.insert(
+                "dependencies",
+                toml_edit::Item::Table(toml_edit::Table::new()),
+            );
+        }
+        let dependencies = doc
+            .get_mut("dependencies")
+            .expect("dependencies should exist");
+        for dep in new_dependencies {
+            if dependencies.get(&dep.name).is_some() {
+                anyhow::bail!(
+                    "package \"{}\" already exists in Nargo.toml dependencies\nRemove the existing entry to install",
+                    dep.name
+                );
+            }
+            let mut table = toml_edit::InlineTable::new();
+            for (key, val) in dep.to_value() {
+                table.insert(&key, val.into());
+            }
+            dependencies
+                .as_table_mut()
+                .ok_or(anyhow::anyhow!("dependencies is not a table in Nargo.toml"))?
+                .insert(&dep.name, table.into());
+        }
+        std::fs::write(&nargo_path, doc.to_string())?;
+
+        Ok(())
     }
 
     /// Validates package metadata. Currently does semver validation for version field.
@@ -85,7 +125,7 @@ impl NargoConfig {
 }
 
 /// Represents the `package` section of a `Nargo.toml` file.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Package {
     pub name: String,
     pub version: Option<String>,
@@ -96,7 +136,7 @@ pub struct Package {
 }
 
 /// Represents each entry in the `dependencies` section of a `Nargo.toml` file.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Dependency {
     #[serde(skip)]
     pub name: String,
@@ -107,6 +147,33 @@ pub struct Dependency {
 }
 
 impl Dependency {
+    pub fn new_git(name: String, url: String, tag: String) -> Self {
+        Self {
+            name,
+            git: Some(url),
+            tag: Some(tag),
+            directory: None,
+            path: None,
+        }
+    }
+
+    pub fn to_value(&self) -> HashMap<String, String> {
+        let mut content = HashMap::new();
+        if let Some(git) = &self.git {
+            content.insert("git".to_string(), git.clone());
+        }
+        if let Some(tag) = &self.tag {
+            content.insert("tag".to_string(), tag.clone());
+        }
+        if let Some(path) = &self.path {
+            content.insert("path".to_string(), path.clone());
+        }
+        if let Some(directory) = &self.directory {
+            content.insert("directory".to_string(), directory.clone());
+        }
+        content
+    }
+
     pub fn is_local(&self) -> bool {
         self.path.is_some()
     }

@@ -13,3 +13,4 @@ serde = { workspace = true }
 log = { workspace = true }
 
 toml = { version = "0.9.7", features = ["serde"] }
+toml_edit = "0"
