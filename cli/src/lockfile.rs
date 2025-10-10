@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use anyhow::Result;
@@ -12,14 +12,14 @@ use nargo_parse::*;
 pub struct Lockfile {
     #[allow(dead_code)]
     pub version: i64,
-    packages_cache: HashMap<String, LockEntry>,
+    packages_cache: BTreeMap<String, LockEntry>,
 }
 
 impl Lockfile {
     pub fn new() -> Self {
         Self {
             version: 0,
-            packages_cache: HashMap::default(),
+            packages_cache: BTreeMap::default(),
         }
     }
 
@@ -28,7 +28,7 @@ impl Lockfile {
         if !path.exists() {
             return Ok(Self::new());
         }
-        let mut s: HashMap<String, toml::Value> = toml::from_str(&std::fs::read_to_string(path)?)?;
+        let mut s: BTreeMap<String, toml::Value> = toml::from_str(&std::fs::read_to_string(path)?)?;
         let packages = match s.remove("packages").unwrap_or(toml::Value::Array(vec![])) {
             toml::Value::Array(packages) => packages
                 .into_iter()
@@ -40,7 +40,7 @@ impl Lockfile {
                 .collect::<Result<Vec<LockEntry>>>()?,
             _ => anyhow::bail!("malformed lockfile, packages must be an array: {path:?}"),
         };
-        let mut packages_cache = HashMap::default();
+        let mut packages_cache = BTreeMap::default();
         for entry in packages {
             let entry_identifier = entry.identifier();
             if packages_cache.contains_key(&entry_identifier) {
@@ -85,7 +85,7 @@ impl Lockfile {
 
     /// Serialize and write to file. This involves transforming the packages cache to a simple vec.
     pub fn save(&self, path: &Path) -> Result<()> {
-        let mut out = HashMap::<String, toml::Value>::default();
+        let mut out = BTreeMap::<String, toml::Value>::default();
         out.insert("version".into(), toml::Value::Integer(0));
         out.insert(
             "packages".into(),
