@@ -90,7 +90,7 @@ async fn run() -> Result<()> {
             let new_dep_name = new_dep_name.clone();
             let api = api.clone();
             join_set.spawn(async move {
-            let (package, version) = api.load_package_latest_version(&new_dep_name).await.context("Unable to install package \"{new_dep_name}\"")?;
+            let (package, version) = api.load_package_latest_version(&new_dep_name).await.context(format!("Unable to install package \"{new_dep_name}\""))?;
             println!("Adding package: {}@{}", package.name, version.name);
             let git_url = format!("{REGISTRY_URL}/{new_dep_name}");
             let tag = version.name;

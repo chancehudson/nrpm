@@ -75,7 +75,7 @@ impl OnyxApi {
             Ok(data)
         } else {
             anyhow::bail!(
-                "failed to load latest version of package \"{}\": {}",
+                "failed to determine latest version of package \"{}\": {}",
                 package_name,
                 response.text().await?
             );
