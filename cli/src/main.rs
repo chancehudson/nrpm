@@ -106,8 +106,42 @@ async fn run() -> Result<()> {
             NargoConfig::add_dependencies_in_place(&path, new_packages).context("Failed to write new dependencies to Nargo.toml")?;
         }
         install::install(path).await?;
+    } else if let Some(_matches) = matches.subcommand_matches("clean") {
+        let path = cache_path()?;
+
+        // remove the contents of the system cache
+        std::fs::remove_dir_all(cache_path()?)?;
+    if !dialoguer::Confirm::new()
+        .with_prompt(format!(
+            "Remove contents of {:?}?", path
+        ))
+        .interact()?
+    {
+        println!("User cancelled the action");
+        return Ok(());
+    }
     }
     Ok(())
+}
+
+/// The shared system cache for noir packages. ~/nargo
+/// 
+/// https://github.com/noir-lang/noir/blob/12e90c0d51fc53998a2b75d6fb302d621227accd/tooling/nargo_toml/src/git.rs#L51
+fn cache_path() -> Result<PathBuf> {
+    // Match the nargo default path.
+    // TODO: make this more configurable
+    let dep_cache_path = dirs::home_dir()
+        .expect("unable to determine user home directory")
+        .join("nargo");
+    if dep_cache_path.exists() && !dep_cache_path.is_dir() {
+        anyhow::bail!(
+            "Global dependency cache is a non-directory! {:?}",
+            dep_cache_path
+        );
+    } else if !dep_cache_path.exists() {
+        std::fs::create_dir(&dep_cache_path)?;
+    }
+    Ok(dep_cache_path)
 }
 
 async fn attempt_auth() -> Result<LoginResponse> {
@@ -145,6 +179,7 @@ fn cli() -> Command {
                 .action(ArgAction::Count)
                 .help("Sets the level of verbosity"),
         )
+        .subcommand(Command::new("clean").about("clear the system package cache directory"))
         .subcommand(
             Command::new("publish")
                 .about("publish a package to the registry")

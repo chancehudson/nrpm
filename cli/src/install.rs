@@ -188,21 +188,7 @@ fn download_dependencies(
     path: &Path,
     progress: &ProgressBar,
 ) -> Result<HashMap<String, (PathBuf, Dependency, NargoConfig)>> {
-    // Match the nargo default path.
-    // TODO: make this more configurable
-    //
-    // https://github.com/noir-lang/noir/blob/12e90c0d51fc53998a2b75d6fb302d621227accd/tooling/nargo_toml/src/git.rs#L51
-    let dep_cache_path = dirs::home_dir()
-        .expect("unable to determine user home directory")
-        .join("nargo");
-    if dep_cache_path.exists() && !dep_cache_path.is_dir() {
-        anyhow::bail!(
-            "Global dependency cache is a non-directory! {:?}",
-            dep_cache_path
-        );
-    } else if !dep_cache_path.exists() {
-        std::fs::create_dir(&dep_cache_path)?;
-    }
+    let dep_cache_path = super::cache_path()?;
 
     // all direct and indirect dependencies for root_pkg
     // identifier keyed to package path (not module path), dependency structure, and Nargo config
