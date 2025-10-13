@@ -84,17 +84,21 @@ async fn run() -> Result<()> {
 
         // the user wants to install a package and add it to Nargo.toml, let's give it a shot
         let mut join_set: JoinSet<Result<Dependency>> = JoinSet::new();
-        let packages_to_install = 
-            matches.get_many::<String>("package_name").unwrap_or_default();
-        for new_dep_name in packages_to_install{
+        let packages_to_install = matches
+            .get_many::<String>("package_name")
+            .unwrap_or_default();
+        for new_dep_name in packages_to_install {
             let new_dep_name = new_dep_name.clone();
             let api = api.clone();
             join_set.spawn(async move {
-            let (package, version) = api.load_package_latest_version(&new_dep_name).await.context(format!("Unable to install package \"{new_dep_name}\""))?;
-            println!("Adding package: {}@{}", package.name, version.name);
-            let git_url = format!("{REGISTRY_URL}/{new_dep_name}");
-            let tag = version.name;
-            Ok(Dependency::new_git(new_dep_name.to_string(), git_url, tag))
+                let (package, version) = api
+                    .load_package_latest_version(&new_dep_name)
+                    .await
+                    .context(format!("Unable to install package \"{new_dep_name}\""))?;
+                println!("Adding package: {}@{}", package.name, version.name);
+                let git_url = format!("{REGISTRY_URL}/{new_dep_name}");
+                let tag = version.name;
+                Ok(Dependency::new_git(new_dep_name.to_string(), git_url, tag))
             });
         }
         let mut new_packages: Vec<Dependency> = Vec::default();
@@ -102,8 +106,9 @@ async fn run() -> Result<()> {
             let dep = dep??;
             new_packages.push(dep);
         }
-        if !new_packages.is_empty(){
-            NargoConfig::add_dependencies_in_place(&path, new_packages).context("Failed to write new dependencies to Nargo.toml")?;
+        if !new_packages.is_empty() {
+            NargoConfig::add_dependencies_in_place(&path, new_packages)
+                .context("Failed to write new dependencies to Nargo.toml")?;
         }
         install::install(path).await?;
     } else if let Some(_matches) = matches.subcommand_matches("clean") {
@@ -111,21 +116,19 @@ async fn run() -> Result<()> {
 
         // remove the contents of the system cache
         std::fs::remove_dir_all(cache_path()?)?;
-    if !dialoguer::Confirm::new()
-        .with_prompt(format!(
-            "Remove contents of {:?}?", path
-        ))
-        .interact()?
-    {
-        println!("User cancelled the action");
-        return Ok(());
-    }
+        if !dialoguer::Confirm::new()
+            .with_prompt(format!("Remove contents of {:?}?", path))
+            .interact()?
+        {
+            println!("User cancelled the action");
+            return Ok(());
+        }
     }
     Ok(())
 }
 
 /// The shared system cache for noir packages. ~/nargo
-/// 
+///
 /// https://github.com/noir-lang/noir/blob/12e90c0d51fc53998a2b75d6fb302d621227accd/tooling/nargo_toml/src/git.rs#L51
 fn cache_path() -> Result<PathBuf> {
     // Match the nargo default path.
@@ -170,15 +173,8 @@ async fn attempt_auth() -> Result<LoginResponse> {
 
 fn cli() -> Command {
     Command::new("nrpm")
-        .version("0.0.0")
+        .version(clap::crate_version!())
         .about("Noir package manager")
-        .arg(
-            Arg::new("verbose")
-                .short('v')
-                .long("verbose")
-                .action(ArgAction::Count)
-                .help("Sets the level of verbosity"),
-        )
         .subcommand(Command::new("clean").about("clear the system package cache directory"))
         .subcommand(
             Command::new("publish")
@@ -197,7 +193,5 @@ fn cli() -> Command {
                 .about("install dependencies for a local project")
                 .arg(Arg::new("path").short('p').long("path").value_name("path").action(ArgAction::Set).help("Install dependencies for a package at a path"))
                 .arg(Arg::new("package_name").value_name("package_name").action(ArgAction::Append))
-                // .arg(clap::arg!([package_name] "Name of a package to install"))
-                
         )
 }
