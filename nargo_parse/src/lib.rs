@@ -159,16 +159,16 @@ impl Dependency {
 
     pub fn to_value(&self) -> HashMap<String, String> {
         let mut content = HashMap::new();
-        if let Some(git) = &self.git {
+        if let Some(git) = self.git.as_ref() {
             content.insert("git".to_string(), git.clone());
         }
-        if let Some(tag) = &self.tag {
+        if let Some(tag) = self.tag.as_ref() {
             content.insert("tag".to_string(), tag.clone());
         }
-        if let Some(path) = &self.path {
+        if let Some(path) = self.path.as_ref() {
             content.insert("path".to_string(), path.clone());
         }
-        if let Some(directory) = &self.directory {
+        if let Some(directory) = self.directory.as_ref() {
             content.insert("directory".to_string(), directory.clone());
         }
         content
@@ -181,11 +181,11 @@ impl Dependency {
     /// A distinct identifier for this dependence. Dependencies with equal identifiers
     /// should be pointing to the same content.
     pub fn identifier(&self) -> Result<String> {
-        if let Some(git) = &self.git
-            && let Some(tag) = &self.tag
+        if let Some(git) = self.git.as_ref()
+            && let Some(tag) = self.tag.as_ref()
         {
             Ok(format!("{}@{}", git, tag))
-        } else if let Some(path) = &self.path {
+        } else if let Some(path) = self.path.as_ref() {
             Ok(format!("{}", path))
         } else {
             anyhow::bail!("invalid dependency configuration");
@@ -202,12 +202,12 @@ impl Dependency {
         } else if self.git.is_some() && self.tag.is_none() {
             anyhow::bail!("git dependencies must specify a tag");
         }
-        if let Some(dir_str) = &self.directory
+        if let Some(dir_str) = self.directory.as_ref()
             && PathBuf::from(dir_str).is_absolute()
         {
             anyhow::bail!("directory must be relative");
         }
-        if let Some(path_str) = &self.path {
+        if let Some(path_str) = self.path.as_ref() {
             let path = PathBuf::from_str(path_str)
                 .map_err(|_| anyhow::anyhow!("failed to parse path: {}", path_str))?;
             let canonical = std::fs::canonicalize(&path).map_err(|e| {
@@ -230,8 +230,8 @@ impl Dependency {
     /// https://github.com/noir-lang/noir/blob/12e90c0d51fc53998a2b75d6fb302d621227accd/tooling/nargo_toml/src/git.rs#L51
     pub fn folder_path(&self, system_cache_path: &Path) -> Result<PathBuf> {
         let mut folder = system_cache_path.to_path_buf();
-        if let Some(git) = &self.git
-            && let Some(tag) = &self.tag
+        if let Some(git) = self.git.as_ref()
+            && let Some(tag) = self.tag.as_ref()
         {
             let url = Url::parse(git)?;
             let domain = url
@@ -248,7 +248,7 @@ impl Dependency {
 
     /// Compute the path of the module relative to the package root directory.
     pub fn module_path(&self, pkg_path: &Path) -> Result<PathBuf> {
-        if let Some(dir) = &self.directory {
+        if let Some(dir) = self.directory.as_ref() {
             let dir_path = PathBuf::from(dir);
             assert!(!dir_path.is_absolute(), "directory must not be absolute");
             Ok(pkg_path.join(dir_path))
